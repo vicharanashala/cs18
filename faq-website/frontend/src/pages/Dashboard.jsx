@@ -1068,7 +1068,7 @@ export default function Dashboard() {
     setActiveCluster(clusterId);
   };
 
-  // Handle Search
+  // Handle Search — guests see FAQ results only; logged-in users see FAQ + Discussion results
   const handleSearch = async (query) => {
     setSearchQuery(query);
     if (!query) {
@@ -1078,21 +1078,33 @@ export default function Dashboard() {
       setFaqMatchType('none');
       return;
     }
-    
+
     setHasSearched(true);
     setIsSearching(true);
     try {
+      const isLoggedIn = Boolean(localStorage.getItem('token'));
+
       if (activeTab === 'faq') {
-        // Fire both in parallel
-        const [resFaq, resDisc] = await Promise.all([
-          axiosClient.get('/search', { params: { q: query, type: 'faq' } }),
-          axiosClient.get('/search', { params: { q: query, type: 'discussion' } })
-        ]);
-        setFaqSearchResults(resFaq.data.matches);
-        setSearchInsight(resFaq.data.insight || '');
-        setFaqMatchType(resFaq.data.matchType || 'none');
-        setDiscussionSearchResults(resDisc.data.matches);
+        // Guests: FAQ results ONLY — discussion section is completely invisible
+        if (isLoggedIn) {
+          const [resFaq, resDisc] = await Promise.all([
+            axiosClient.get('/search', { params: { q: query, type: 'faq' } }),
+            axiosClient.get('/search', { params: { q: query, type: 'discussion' } }),
+          ]);
+          setFaqSearchResults(resFaq.data.matches);
+          setSearchInsight(resFaq.data.insight || '');
+          setFaqMatchType(resFaq.data.matchType || 'none');
+          setDiscussionSearchResults(resDisc.data.matches);
+        } else {
+          // Guest path — never fires discussion search, never leaks content existence
+          const resFaq = await axiosClient.get('/search', { params: { q: query, type: 'faq' } });
+          setFaqSearchResults(resFaq.data.matches || []);
+          setSearchInsight(resFaq.data.insight || '');
+          setFaqMatchType(resFaq.data.matchType || 'none');
+          setDiscussionSearchResults([]); // explicitly empty — no cluster results rendered
+        }
       } else {
+        // Discussions tab — only accessible when logged in (route guard exists in App.jsx)
         const res = await axiosClient.get('/search', { params: { q: query, type: 'discussion' } });
         setDiscussionSearchResults(res.data.matches);
       }
@@ -1346,6 +1358,19 @@ export default function Dashboard() {
                         <div className="grid gap-4">
                           {discussionSearchResults.map(c => <ClusterCard key={c._id} cluster={c} onOpenThread={handleOpenCluster} onTagClick={handleSearch} currentUserId={user?._id} pizzaSlices={user?.pizzaSlices} onBoost={(id, data) => { if (data) refreshClusters(); }} />)}
                         </div>
+                      </div>
+                    )}
+
+                    {/* Guest: FAQ-only empty state — no mention of discussions, clusters, or hidden content */}
+                    {!isSearching && !localStorage.getItem('token') && faqSearchResults.length === 0 && (
+                      <div className="text-center py-24 flex flex-col items-center">
+                        <p className="text-slate-500 font-medium mb-6">No matching FAQs found.</p>
+                        <button
+                          onClick={() => navigate('/login')}
+                          className="glass-dark text-white font-semibold py-3.5 px-6 rounded-2xl hover:bg-white/5 border border-white/5 transition-all text-sm flex items-center gap-2 font-bricolage cursor-pointer"
+                        >
+                          Log in to explore more
+                        </button>
                       </div>
                     )}
 

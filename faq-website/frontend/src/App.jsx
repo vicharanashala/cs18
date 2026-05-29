@@ -31,70 +31,78 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/faq" element={<Navigate to="/dashboard?tab=faq" replace />} />
-        <Route path="/discussions" element={<Navigate to="/dashboard?tab=discussions" replace />} />
-        <Route 
-          path="/dashboard/*" 
+        <Route
+          path="/discussions"
+          element={
+            // Guests cannot access OAQ / cluster / discussion routes
+            <ProtectedRoute role="student">
+              <Navigate to="/dashboard?tab=discussions" replace />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/*"
           element={
             <ProtectedRoute role="student">
               <Dashboard />
             </ProtectedRoute>
-          } 
+          }
         />
-        <Route 
-          path="/raise-ticket" 
+        <Route
+          path="/raise-ticket"
           element={
             <ProtectedRoute role="student">
               <RaiseTicket />
             </ProtectedRoute>
-          } 
+          }
         />
-        <Route 
-          path="/contribute-faq" 
+        <Route
+          path="/contribute-faq"
           element={
             <ProtectedRoute role="student">
               <ContributeFAQ />
             </ProtectedRoute>
-          } 
+          }
         />
-        <Route 
-          path="/wallet" 
+        <Route
+          path="/wallet"
           element={
             <ProtectedRoute role="student">
               <WalletPage />
             </ProtectedRoute>
-          } 
+          }
         />
-        <Route 
-          path="/track-status/:ticketId" 
+        <Route
+          path="/track-status/:ticketId"
           element={
             <ProtectedRoute role="student">
               <TicketStatusPage />
             </ProtectedRoute>
-          } 
+          }
         />
-        <Route 
-          path="/golden-ticket" 
+        <Route
+          path="/golden-ticket"
           element={
             <ProtectedRoute role="student">
               <GoldenTicket />
             </ProtectedRoute>
-          } 
+          }
         />
-        <Route 
-          path="/admin/intelligence" 
+        <Route
+          path="/admin/intelligence"
           element={
             <ProtectedRoute role="admin">
               <AdminIntelligencePage />
             </ProtectedRoute>
-          } 
+          }
         />
-        <Route 
-          path="/admin/*" 
+        <Route
+          path="/admin/*"
           element={
             <ProtectedRoute role="admin">
               <AdminDashboard />
             </ProtectedRoute>
-          } 
+          }
         />
       </Routes>
     </Router>
