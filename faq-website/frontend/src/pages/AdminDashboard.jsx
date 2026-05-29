@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import AdminSettingsTab from './AdminSettingsTab';
 import { useNavigate } from 'react-router-dom';
 import axiosClient from '../api/axiosClient';
 import toast from 'react-hot-toast';
@@ -20,6 +21,7 @@ export default function AdminDashboard() {
   const [resolvedAnswers, setResolvedAnswers] = useState({}); // ticketId -> string
   const [ticketQuirks, setTicketQuirks] = useState({}); // ticketId -> string
   const [submittingAction, setSubmittingAction] = useState(null);
+  const [activeAdminSection, setActiveAdminSection] = useState('queue'); // 'queue' | 'settings'
   
   const authFailedRef = useRef(false);
 
@@ -238,6 +240,35 @@ export default function AdminDashboard() {
         </div>
       </header>
 
+      {/* Tab navigation */}
+      <div className="px-10 pt-8">
+        <div className="flex items-center gap-1 p-1 rounded-2xl bg-white/[0.03] border border-white/5 w-fit">
+          <button
+            onClick={() => setActiveAdminSection('queue')}
+            className={[
+              'px-5 py-2.5 rounded-xl text-sm font-semibold font-bricolage transition-all duration-200',
+              activeAdminSection === 'queue'
+                ? 'bg-white/10 text-slate-100 shadow-inner'
+                : 'text-slate-500 hover:text-slate-300 cursor-pointer',
+            ].join(' ')}
+          >
+            Review Queue
+          </button>
+          <button
+            onClick={() => setActiveAdminSection('settings')}
+            className={[
+              'px-5 py-2.5 rounded-xl text-sm font-semibold font-bricolage transition-all duration-200',
+              activeAdminSection === 'settings'
+                ? 'bg-white/10 text-slate-100 shadow-inner'
+                : 'text-slate-500 hover:text-slate-300 cursor-pointer',
+            ].join(' ')}
+          >
+            Settings
+          </button>
+        </div>
+      </div>
+
+      {activeAdminSection === 'queue' && (
       <main className="p-8 md:p-12 max-w-5xl mx-auto relative z-10 space-y-16">
         
         {/* Discussion Review Queue */}
@@ -565,6 +596,9 @@ export default function AdminDashboard() {
         </div>
 
       </main>
+      )}
+
+      {activeAdminSection === 'settings' && <AdminSettingsTab />}
     </div>
   );
 }

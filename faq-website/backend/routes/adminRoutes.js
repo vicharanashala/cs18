@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const adminController = require('../controllers/adminController');
+const systemSettingsController = require('../controllers/systemSettingsController');
 const adminMiddleware = require('../middleware/adminMiddleware');
 const authMiddleware = require('../middleware/authMiddleware');
 
@@ -17,5 +18,11 @@ router.get('/duplicates',       authMiddleware, adminMiddleware, adminController
 router.post('/merge-duplicate', authMiddleware, adminMiddleware, adminController.applyMerge);
 router.post('/run-deduplication', authMiddleware, adminMiddleware, adminController.runDeduplication);
 router.post('/split-cluster',   authMiddleware, adminMiddleware, adminController.splitCluster);
+
+// ─── System Settings ───────────────────────────────────────────────────────────
+router.get('/settings',                  authMiddleware, adminMiddleware, systemSettingsController.getSettings);
+router.patch('/settings/pizza',          authMiddleware, adminMiddleware, systemSettingsController.updatePizzaSettings);
+router.post('/settings/pizza/apply-migration', authMiddleware, adminMiddleware, systemSettingsController.applyPizzaMigration);
+router.patch('/settings/public-faq',     authMiddleware, adminMiddleware, systemSettingsController.updatePublicFAQSettings);
 
 module.exports = router;
