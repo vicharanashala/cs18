@@ -110,6 +110,10 @@ export default function NotificationProvider({ children }) {
   }, []);
 
   // ── Socket.IO real-time setup ───────────────────────────────────────────────
+  // Stable ref so the effect only runs once on mount (not on every render)
+  const fetchRef = useRef(fetchNotifications);
+  fetchRef.current = fetchNotifications;
+
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) return;
@@ -117,12 +121,13 @@ export default function NotificationProvider({ children }) {
     const socket = io('http://localhost:3001', {
       auth: { token },
       transports: ['websocket', 'polling'],
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
     });
     socketRef.current = socket;
 
     socket.on('connect', () => {
-      // Tell backend our userId (decoded from token server-side ideally, but
-      // we pass it explicitly for simplicity)
+      console.log('[Socket.IO] Connected:', socket.id);
       const payload = JSON.parse(atob(token.split('.')[1]));
       socket.emit('user:join', { userId: payload.id });
     });
@@ -134,16 +139,17 @@ export default function NotificationProvider({ children }) {
       showToast(notification);
     });
 
-    // Real-time broadcast
-    socket.on('notification:broadcast', (data) => {
-      // For broadcast we refresh the whole list
-      fetchNotifications(1, true);
+    // Real-time broadcast — refresh whole list
+    socket.on('notification:broadcast', () => {
+      fetchRef.current(1, true);
     });
 
-    socket.on('disconnect', () => console.log('[Socket.IO] Disconnected'));
+    socket.on('disconnect', (reason) => console.log('[Socket.IO] Disconnected:', reason));
+    socket.on('connect_error', (err) => console.error('[Socket.IO] Connection error:', err.message));
 
     return () => socket.disconnect();
-  }, [fetchNotifications]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty deps = run once on mount, cleanup on unmount
 
   // ── Toast notification popup ────────────────────────────────────────────────
   const showToast = useCallback((notification) => {
