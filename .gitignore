@@ -9,3 +9,4 @@ dist
 *.key
 credentials
 secrets.json
+.DS_Store
