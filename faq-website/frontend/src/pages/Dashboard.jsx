@@ -457,8 +457,11 @@ const ClusterCard = memo(function ClusterCard({ cluster, onOpenThread, onTagClic
   const isParticipant = currentUserId && (cluster.participants || []).some(
     p => (typeof p.userId === 'object' ? p.userId._id : p.userId) === currentUserId
   );
+  // Also check backend-set hasJoined flag (set when participants were populated)
+  const hasJoined = cluster.hasJoined || isParticipant;
 
-  const canBoost = !!(isParticipant && cluster.status === 'OPEN' && !['CLOSED', 'REJECTED'].includes(cluster.status));
+  // Can boost if: user has joined/participated AND cluster is not resolved/closed/rejected
+  const canBoost = !!(hasJoined && cluster.status === 'OPEN' && !['CLOSED', 'REJECTED'].includes(cluster.status));
 
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
