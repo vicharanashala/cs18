@@ -45,6 +45,7 @@ const goldenTicketSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    knowledgeCaptured: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

@@ -84,6 +84,7 @@ exports.promoteToFaq = async (req, res) => {
     cluster.tags = tags || cluster.tags || [];
     cluster.embedding = embedding;
     cluster.moderationNotes = `Promoted to FAQ by admin ${req.user.id}`;
+    cluster.promotedToFAQ = true;
     await cluster.save();
 
     res.json({ message: 'FAQ successfully promoted', faq });

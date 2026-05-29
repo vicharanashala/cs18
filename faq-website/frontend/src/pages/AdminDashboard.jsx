@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from 'react';
-import AdminSettingsTab from './AdminSettingsTab';
 import { useNavigate } from 'react-router-dom';
 import axiosClient from '../api/axiosClient';
 import toast from 'react-hot-toast';
@@ -9,6 +8,7 @@ import ThemeToggle from '../components/ThemeToggle';
 import GoldenTicketIcon from '../components/GoldenTicketIcon';
 import StatusBadge from '../components/StatusBadge';
 import DeduplicationSection from '../components/DeduplicationSection';
+import FAQPromotionModal from '../components/FAQPromotionModal';
 import { FAQ_CATEGORIES } from '../utils/constants';
 
 export default function AdminDashboard() {
@@ -21,7 +21,8 @@ export default function AdminDashboard() {
   const [resolvedAnswers, setResolvedAnswers] = useState({}); // ticketId -> string
   const [ticketQuirks, setTicketQuirks] = useState({}); // ticketId -> string
   const [submittingAction, setSubmittingAction] = useState(null);
-  const [activeAdminSection, setActiveAdminSection] = useState('queue'); // 'queue' | 'settings'
+  const [contributions, setContributions] = useState([]); // Phase 2F
+  const [promotionModal, setPromotionModal] = useState({ isOpen: false, source: null, sourceItem: null });
   
   const authFailedRef = useRef(false);
 
@@ -31,7 +32,8 @@ export default function AdminDashboard() {
       await Promise.all([
         fetchQueue(),
         fetchGoldenTickets(),
-        fetchPersonalTickets()
+        fetchPersonalTickets(),
+        fetchContributions(),
       ]);
     };
     
@@ -47,6 +49,13 @@ export default function AdminDashboard() {
     
     return () => clearInterval(intervalId);
   }, []);
+
+  const fetchContributions = async () => {
+    try {
+      const res = await axiosClient.get('/admin/contributions/pending');
+      setContributions(res.data.contributions || []);
+    } catch (_) { /* silent */ }
+  };
 
   const handleAuthError = (err) => {
     if (authFailedRef.current) return;
@@ -185,6 +194,16 @@ export default function AdminDashboard() {
     }
   };
 
+  const openPromotionModal = (source, sourceItem) => {
+    setPromotionModal({ isOpen: true, source, sourceItem });
+  };
+
+  const handlePromoted = () => {
+    fetchQueue();
+    fetchGoldenTickets();
+    fetchContributions();
+  };
+
   const handleResolvePersonal = async (ticketId) => {
     const resolvedAnswer = resolvedAnswers[ticketId];
     const quirks = ticketQuirks[ticketId];
@@ -240,35 +259,6 @@ export default function AdminDashboard() {
         </div>
       </header>
 
-      {/* Tab navigation */}
-      <div className="px-10 pt-8">
-        <div className="flex items-center gap-1 p-1 rounded-2xl bg-white/[0.03] border border-white/5 w-fit">
-          <button
-            onClick={() => setActiveAdminSection('queue')}
-            className={[
-              'px-5 py-2.5 rounded-xl text-sm font-semibold font-bricolage transition-all duration-200',
-              activeAdminSection === 'queue'
-                ? 'bg-white/10 text-slate-100 shadow-inner'
-                : 'text-slate-500 hover:text-slate-300 cursor-pointer',
-            ].join(' ')}
-          >
-            Review Queue
-          </button>
-          <button
-            onClick={() => setActiveAdminSection('settings')}
-            className={[
-              'px-5 py-2.5 rounded-xl text-sm font-semibold font-bricolage transition-all duration-200',
-              activeAdminSection === 'settings'
-                ? 'bg-white/10 text-slate-100 shadow-inner'
-                : 'text-slate-500 hover:text-slate-300 cursor-pointer',
-            ].join(' ')}
-          >
-            Settings
-          </button>
-        </div>
-      </div>
-
-      {activeAdminSection === 'queue' && (
       <main className="p-8 md:p-12 max-w-5xl mx-auto relative z-10 space-y-16">
         
         {/* Discussion Review Queue */}
@@ -392,12 +382,12 @@ export default function AdminDashboard() {
 
                       <div className="flex flex-col sm:flex-row gap-4 font-bricolage pt-4 border-t border-white/5">
                         <button
-                          onClick={() => promoteFaq(cluster._id)}
+                          onClick={() => openPromotionModal('oaq', cluster)}
                           disabled={submittingAction === cluster._id}
                           className="flex-1 badge-green py-4 rounded-2xl font-bold hover:bg-green-950/20 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed text-green-900 dark:text-green-300 bg-green-100 dark:bg-green-900/30"
                         >
                           {submittingAction === cluster._id ? <span className="animate-spin text-lg">⏳</span> : <CheckCircle size={18} />}
-                          Approve & Promote to FAQ
+                          Promote to FAQ
                         </button>
                         <button
                           onClick={() => rejectCluster(cluster._id)}
@@ -580,12 +570,13 @@ export default function AdminDashboard() {
                         {submittingAction === `reject-${ticket._id}` ? <span className="animate-spin text-lg">⏳</span> : <XCircle size={18} className="group-hover:scale-105 transition-transform" />}
                         Reject & Ban User
                       </button>
-                      <button onClick={() => resolveGoldenTicket(ticket._id)}
+                      <button
+                        onClick={() => openPromotionModal('golden-ticket', ticket)}
                         disabled={submittingAction === ticket._id}
                         className={`flex items-center gap-2 px-8 py-3 rounded-xl font-bold shadow-lg transition-all border cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${'bg-gradient-to-r from-yellow-500 to-amber-400 dark:from-yellow-600 dark:to-amber-500 hover:from-yellow-400 hover:to-amber-300 text-black shadow-yellow-500/20 border-yellow-400/30'}`}
                       >
                         {submittingAction === ticket._id ? <span className="animate-spin text-lg">⏳</span> : <CheckCircle size={18} />}
-                        Resolve Ticket
+                        Promote to FAQ
                       </button>
                     </div>
                   </div>
@@ -595,10 +586,99 @@ export default function AdminDashboard() {
           )}
         </div>
 
-      </main>
-      )}
+        {/* ─── FAQ Contributions (Phase 2F) ─────────────────────────────── */}
+        <div>
+          <div className="flex items-center justify-between mb-8">
+            <h2 className="text-2xl font-bold font-bricolage tracking-tight text-blue-400 flex items-center gap-2">
+              <span>📬</span> FAQ Contributions
+            </h2>
+            <StatusBadge variant="blue">
+              {contributions.length} Pending
+            </StatusBadge>
+          </div>
 
-      {activeAdminSection === 'settings' && <AdminSettingsTab />}
+          {contributions.length === 0 ? (
+            <div className="glass-strong rounded-3xl p-16 flex flex-col items-center justify-center text-slate-500 dark:text-slate-400 font-semibold border border-blue-500/10 shadow-sm bg-white dark:bg-transparent">
+              <div className="bg-blue-50 dark:bg-blue-500/10 p-4 rounded-full mb-4">
+                <span className="text-3xl">📪</span>
+              </div>
+              <p className="text-lg text-slate-800 dark:text-slate-300">No pending contributions.</p>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {contributions.map(contrib => (
+                <motion.div
+                  key={contrib._id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="glass-strong rounded-3xl overflow-hidden border border-blue-500/20 shadow-xl"
+                >
+                  <div className="px-9 py-7 bg-blue-500/[0.03] border-b border-white/5">
+                    <div className="flex justify-between items-start gap-4 mb-3">
+                      <div className="flex-1">
+                        <div className="text-xs font-bold text-blue-400 uppercase tracking-widest mb-1 font-bricolage">
+                          {contrib.sourceType || 'community'}
+                        </div>
+                        <h3 className="font-bold font-bricolage text-xl text-slate-100 leading-snug">
+                          {contrib.generatedQuestion || contrib.originalQuestion}
+                        </h3>
+                      </div>
+                      <StatusBadge variant="blue">
+                        {contrib.category || 'Uncategorized'}
+                      </StatusBadge>
+                    </div>
+                    {contrib.generatedQuestion && (
+                      <p className="text-sm text-slate-500 italic">
+                        Original: {contrib.originalQuestion}
+                      </p>
+                    )}
+                  </div>
+
+                  {contrib.generatedAnswer && (
+                    <div className="px-9 py-6 border-b border-white/5">
+                      <div className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 font-bricolage">AI-Generated Answer</div>
+                      <p className="text-slate-300 leading-relaxed whitespace-pre-wrap">{contrib.generatedAnswer}</p>
+                    </div>
+                  )}
+
+                  {contrib.hashtags?.length > 0 && (
+                    <div className="px-9 py-4 flex flex-wrap gap-2 border-b border-white/5">
+                      {contrib.hashtags.map(tag => (
+                        <span key={tag} className="text-xs font-bold bg-blue-500/10 text-blue-400 px-3 py-1 rounded-full border border-blue-500/20">
+                          #{tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="px-9 py-6 flex items-center justify-between gap-4 bg-black/20">
+                    <p className="text-xs text-slate-500 font-bricolage">
+                      Contributed{contrib.contributedBy?.email ? ` by ${contrib.contributedBy.email}` : ''}
+                      {contrib.createdAt && ` on ${new Date(contrib.createdAt).toLocaleDateString()}`}
+                    </p>
+                    <button
+                      onClick={() => openPromotionModal('contribution', contrib)}
+                      className="flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-sm bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 border border-blue-500/30 transition-all font-bricolage cursor-pointer"
+                    >
+                      <CheckCircle size={16} />
+                      Promote to FAQ
+                    </button>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          )}
+        </div>
+
+      </main>
+
+      <FAQPromotionModal
+        isOpen={promotionModal.isOpen}
+        onClose={() => setPromotionModal({ isOpen: false, source: null, sourceItem: null })}
+        source={promotionModal.source}
+        sourceItem={promotionModal.sourceItem}
+        onPromoted={handlePromoted}
+      />
     </div>
   );
 }

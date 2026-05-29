@@ -56,6 +56,7 @@ const semanticClusterSchema = new mongoose.Schema({
   generatedTags:    { type: [String], default: [] },
   spWeight:         { type: Number, default: 0 },
   moderationNotes:  { type: String },
+  promotedToFAQ:    { type: Boolean, default: false },
   resolvedBy:       { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
 
   // ── Boost ─────────────────────────────────────────────────────────────────
