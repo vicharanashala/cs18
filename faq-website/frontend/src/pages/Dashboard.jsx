@@ -446,6 +446,12 @@ function UrgencyBadge({ cluster }) {
 const ClusterCard = memo(function ClusterCard({ cluster, onOpenThread, onTagClick }) {
   const isUrgent = cluster.isUrgent;
 
+  // Defensive: search API normalizes canonicalQuestion → question, main feed uses canonicalQuestion
+  const displayQuestion = cluster?.question || cluster?.canonicalQuestion || '(no question)';
+
+  // Show original question section if available (main feed has originalQuestion, search API returns it too)
+  const hasOriginalQuestion = cluster?.originalQuestion && cluster.originalQuestion !== displayQuestion;
+
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
       className={isUrgent
@@ -458,7 +464,7 @@ const ClusterCard = memo(function ClusterCard({ cluster, onOpenThread, onTagClic
 
       <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4 mb-4 relative z-10">
         <h3 className="font-bold font-bricolage text-xl text-slate-100 leading-snug group-hover:underline decoration-wavy decoration-pink-400/50 transition-all flex-1">
-          {cluster?.canonicalQuestion || 'Loading...'}
+          {displayQuestion}
         </h3>
         <div className="flex flex-wrap md:flex-row gap-2 self-start">
           {isUrgent && <UrgencyBadge cluster={cluster} />}
@@ -483,7 +489,7 @@ const ClusterCard = memo(function ClusterCard({ cluster, onOpenThread, onTagClic
           )}
         </div>
       </div>
-      {cluster.originalQuestion && (
+      {hasOriginalQuestion && (
         <div className="relative pl-4 mb-4">
           <div className={`absolute left-0 top-0 h-full w-0.5 rounded-full ${isUrgent ? 'bg-orange-500/40' : 'bg-pink-500/30'}`} />
           <p className="text-slate-300 text-sm font-semibold break-words whitespace-normal">"{cluster.originalQuestion}"</p>

@@ -17,19 +17,21 @@ const { searchFAQs, normalizeQuery, clusterSimilarQuestions, deduplicateFeedItem
 function normalizeItem(item, type = 'faq') {
   if (type === 'cluster') {
     return {
-      _id:             item._id,
-      question:        item.canonicalQuestion  || item.originalQuestion,
-      answer:          item.aiGeneratedAnswer  || item.context        || '',
-      category:        item.category           || '',
-      hashtags:        item.hashtags           || [],
-      embedding:       item.embedding          || [],
-      helpfulCount:    item.helpfulCount     || 0,
-      notHelpfulCount: item.notHelpfulCount || 0,
-      viewCount:       item.viewCount        || 0,
-      engagementScore: item.engagementScore  || 0,
-      lastValidatedAt: item.updatedAt,
-      isVerified:      item.status === 'PROMOTED',
-      isCluster:       true,
+      _id:              item._id,
+      question:         item.canonicalQuestion  || item.originalQuestion,
+      answer:           item.aiGeneratedAnswer  || item.context        || '',
+      originalQuestion: item.originalQuestion   || item.canonicalQuestion || '',
+      context:          item.context            || item.aiGeneratedAnswer || '',
+      category:         item.category           || '',
+      hashtags:         item.hashtags           || [],
+      embedding:        item.embedding          || [],
+      helpfulCount:     item.helpfulCount     || 0,
+      notHelpfulCount:  item.notHelpfulCount || 0,
+      viewCount:        item.viewCount        || 0,
+      engagementScore:  item.engagementScore  || 0,
+      lastValidatedAt:  item.updatedAt,
+      isVerified:       item.status === 'PROMOTED',
+      isCluster:        true,
     };
   }
   if (type === 'contrib') {
