@@ -1,104 +1,134 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, ChevronUp, UserCheck, Link2, Clock } from 'lucide-react';
+import { ChevronDown, UserCheck, Link2, Clock, Users as UsersIcon } from 'lucide-react';
 import Avatar from './Avatar';
 
 /**
- * Shows a collapsible list of who joined a cluster and how.
+ * JoinedUsersAccordion — shows who joined a cluster.
  *
  * Props:
- *   participants  — [{ userId, joinedAt, joinMethod, question }]
- *   relatedQueries — [{ userId, joinedAt, joinMethod, question }]
- *   totalCount    — submissionsCount (legacy field)
+ *   participants   — [{ userId, joinedAt, joinMethod, question }]
+ *   relatedQueries — [{ userId, joinedAt, question }]
+ *   totalCount     — fallback count (submissionsCount), optional
+ *
+ * Shows a "N people joined ▼" toggle. Clicking expands to list each user
+ * with their avatar, name, join method badge, and their typed question.
+ *
+ * Empty state: renders nothing (no broken dropdown).
  */
-export default function JoinedUsersAccordion({ participants = [], relatedQueries = [], totalCount = 0 }) {
+export default function JoinedUsersAccordion({
+  participants = [],
+  relatedQueries = [],
+  totalCount,
+}) {
   const [open, setOpen] = useState(false);
 
-  // Deduplicate by userId — prefer the richer record
+  // Deduplicate by userId — prefer the richer participant record
   const userMap = new Map();
 
   for (const p of participants) {
     if (!p?.userId) continue;
-    const uid = p.userId._id || p.userId;
+    const uid = typeof p.userId === 'object' ? p.userId._id : p.userId;
     if (!userMap.has(uid)) {
       userMap.set(uid, {
-        userId: p.userId,
-        joinedAt: p.joinedAt,
+        userId:     p.userId,
+        joinedAt:   p.joinedAt,
         joinMethod: p.joinMethod || 'MANUAL',
-        question: p.question || null,
+        question:   p.question || null,
       });
     }
   }
 
   for (const r of relatedQueries) {
     if (!r?.userId) continue;
-    const uid = r.userId._id || r.userId;
-    if (userMap.has(uid)) continue; // keep the participant record if it exists
+    const uid = typeof r.userId === 'object' ? r.userId._id : r.userId;
+    if (userMap.has(uid)) continue;
     userMap.set(uid, {
-      userId: r.userId,
-      joinedAt: r.joinedAt,
-      joinMethod: r.joinMethod || 'AUTO_CLUSTERED',
-      question: r.question || null,
+      userId:     r.userId,
+      joinedAt:   r.joinedAt,
+      joinMethod: 'AUTO_CLUSTERED',
+      question:   r.question || null,
     });
   }
 
   const users = Array.from(userMap.values());
 
+  // Never render a broken/empty accordion
   if (users.length === 0) return null;
 
-  const autoCount = users.filter(u => u.joinMethod === 'AUTO_CLUSTERED').length;
-  const manualCount = users.filter(u => u.joinMethod === 'MANUAL').length;
+  const autoCount    = users.filter(u => u.joinMethod === 'AUTO_CLUSTERED').length;
+  const manualCount  = users.filter(u => u.joinMethod === 'MANUAL').length;
 
   return (
     <div className="mt-3 border-t border-white/5 pt-3">
       {/* Toggle button */}
       <button
         onClick={() => setOpen(o => !o)}
+        aria-expanded={open}
+        aria-controls="joined-users-list"
         className="w-full flex items-center justify-between px-1 py-1.5 rounded-xl hover:bg-white/[0.03] transition-colors group"
       >
-        <span className="text-xs font-semibold text-slate-400 group-hover:text-slate-300 transition-colors flex items-center gap-2 font-bricolage">
-          <Users size={13} />
+        <span className="flex items-center gap-2 text-xs font-semibold text-slate-400 group-hover:text-slate-300 transition-colors font-bricolage">
+          <UsersIcon size={13} className="text-slate-500" />
           {users.length} {users.length === 1 ? 'person' : 'people'} joined
           {autoCount > 0 && (
             <span className="text-[10px] text-purple-400 bg-purple-500/10 border border-purple-500/20 px-1.5 py-0.5 rounded-full">
-              {autoCount} auto-merged
+              {autoCount} auto
+            </span>
+          )}
+          {manualCount > 0 && (
+            <span className="text-[10px] text-emerald-400/70 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded-full">
+              {manualCount} manual
             </span>
           )}
         </span>
-        {open ? (
-          <ChevronUp size={14} className="text-slate-500" />
-        ) : (
-          <ChevronDown size={14} className="text-slate-500" />
-        )}
+
+        {/* Animated chevron — rotates 180° when open */}
+        <motion.span
+          animate={{ rotate: open ? 180 : 0 }}
+          transition={{ duration: 0.2, ease: 'easeInOut' }}
+          className="text-slate-500"
+        >
+          <ChevronDown size={14} />
+        </motion.span>
       </button>
 
-      {/* Expanded list */}
+      {/* Expanded user list */}
       <AnimatePresence initial={false}>
         {open && (
           <motion.div
+            id="joined-users-list"
+            role="list"
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.2, ease: 'easeInOut' }}
+            transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
             className="overflow-hidden"
           >
-            <div className="space-y-2 pt-2 pb-1">
+            <div className="space-y-2 pt-3 pb-1">
               {users.map((entry) => {
-                const user = entry.userId;
-                const isAuto = entry.joinMethod === 'AUTO_CLUSTERED';
-                const timeStr = entry.joinedAt
-                  ? new Date(entry.joinedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+                const user     = entry.userId;
+                const userData = typeof user === 'object' ? user : { _id: user };
+                const isAuto   = entry.joinMethod === 'AUTO_CLUSTERED';
+                const timeStr  = entry.joinedAt
+                  ? new Date(entry.joinedAt).toLocaleDateString('en-IN', {
+                      day: 'numeric',
+                      month: 'short',
+                    })
                   : '';
 
                 return (
-                  <div key={user._id} className="flex items-start gap-3 px-2 py-2 rounded-xl hover:bg-white/[0.02] transition-colors">
-                    <Avatar user={user} size={26} className="flex-shrink-0 mt-0.5" />
+                  <div
+                    key={userData._id}
+                    role="listitem"
+                    className="flex items-start gap-3 px-2 py-2 rounded-xl hover:bg-white/[0.02] transition-colors"
+                  >
+                    <Avatar user={userData} size={28} className="flex-shrink-0 mt-0.5" />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-xs font-bold text-slate-300 font-bricolage">
-                          {user.username || user.email || 'Anonymous'}
+                          {userData.username || userData.email || 'Anonymous'}
                         </span>
-                        {/* Join method badge */}
                         {isAuto ? (
                           <span className="inline-flex items-center gap-1 text-[10px] font-bold text-purple-300 bg-purple-500/10 border border-purple-500/20 px-1.5 py-0.5 rounded-full font-bricolage">
                             <Link2 size={9} /> auto
@@ -109,16 +139,16 @@ export default function JoinedUsersAccordion({ participants = [], relatedQueries
                           </span>
                         )}
                       </div>
-                      {/* Their typed question variant */}
-                      {entry.question && entry.question !== user.question && (
+                      {entry.question && (
                         <p className="text-[11px] text-slate-500 italic leading-relaxed break-words whitespace-normal mt-0.5">
-                          "{entry.question}"
+                          &ldquo;{entry.question}&rdquo;
                         </p>
                       )}
                     </div>
                     {timeStr && (
                       <span className="text-[10px] text-slate-600 flex-shrink-0 mt-1 flex items-center gap-1">
-                        <Clock size={9} />{timeStr}
+                        <Clock size={9} />
+                        {timeStr}
                       </span>
                     )}
                   </div>
@@ -129,18 +159,5 @@ export default function JoinedUsersAccordion({ participants = [], relatedQueries
         )}
       </AnimatePresence>
     </div>
-  );
-}
-
-function Users({ size = 14, className = '' }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
-      stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-      className={className}>
-      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-      <circle cx="9" cy="7" r="4" />
-      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-    </svg>
   );
 }

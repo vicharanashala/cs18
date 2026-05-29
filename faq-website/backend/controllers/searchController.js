@@ -16,6 +16,18 @@ const { searchFAQs, normalizeQuery, clusterSimilarQuestions, deduplicateFeedItem
 /** Normalise a contributed/discussion FAQ into the same shape as a main FAQ */
 function normalizeItem(item, type = 'faq') {
   if (type === 'cluster') {
+    // Participants can be populated (lean() after populate) or raw ObjectIds
+    const participants = (item.participants || []).map(p => ({
+      userId:     typeof p.userId === 'object' ? p.userId : { _id: p.userId },
+      joinedAt:   p.joinedAt,
+      joinMethod: p.joinMethod,
+      question:   p.question,
+    }));
+    const relatedQueries = (item.relatedQueries || []).map(r => ({
+      userId:   typeof r.userId === 'object' ? r.userId : { _id: r.userId },
+      joinedAt: r.joinedAt,
+      question: r.question,
+    }));
     return {
       _id:              item._id,
       question:         item.canonicalQuestion  || item.originalQuestion,
@@ -32,6 +44,9 @@ function normalizeItem(item, type = 'faq') {
       lastValidatedAt:  item.updatedAt,
       isVerified:       item.status === 'PROMOTED',
       isCluster:        true,
+      participants,
+      relatedQueries,
+      submissionsCount: item.submissionsCount  || 0,
     };
   }
   if (type === 'contrib') {

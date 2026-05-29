@@ -200,6 +200,8 @@ exports.getClusters = async (req, res, next) => {
     let clusters = await SemanticCluster.find({ status: 'OPEN' })
       .sort({ isUrgent: -1, createdAt: -1 })
       .select('-embedding')
+      .populate('participants.userId', '_id username email reputation')
+      .populate('relatedQueries.userId', '_id username email reputation')
       .lean();
 
     // Attach variants count and ensure relatedQueries exists

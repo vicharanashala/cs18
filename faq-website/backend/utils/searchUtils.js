@@ -438,7 +438,7 @@ function deduplicateFeedItems(items, threshold = 0.78) {
     }
 
     if (match) {
-      // Group under the existing representative
+      // Group under the existing representative; keep the richer participants record
       match._groupedCount = (match._groupedCount || 1) + 1;
       match._groupedVariants = match._groupedVariants || [];
       match._groupedVariants.push({
@@ -446,8 +446,12 @@ function deduplicateFeedItems(items, threshold = 0.78) {
         question,
         submissionsCount: item.submissionsCount || 0,
       });
+      // Merge participants if the incoming item has more/better user data
+      if ((item.participants || []).length > (match.participants || []).length) {
+        match.participants = item.participants;
+      }
     } else {
-      // New canonical entry
+      // New canonical entry — preserve full participants array
       result.push({ ...item, _groupedCount: 1, _groupedVariants: [] });
       used.add(item._id);
     }
