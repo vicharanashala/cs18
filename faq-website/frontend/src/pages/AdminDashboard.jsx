@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axiosClient from '../api/axiosClient';
 import toast from 'react-hot-toast';
-import { LogOut, CheckCircle, XCircle, Sparkles, Inbox, RefreshCw } from 'lucide-react';
+import { LogOut, CheckCircle, XCircle, Sparkles, Inbox, RefreshCw, Menu, X, Settings, Ticket, BarChart2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ThemeToggle from '../components/ThemeToggle';
 import GoldenTicketIcon from '../components/GoldenTicketIcon';
@@ -23,6 +23,8 @@ export default function AdminDashboard() {
   const [submittingAction, setSubmittingAction] = useState(null);
   const [contributions, setContributions] = useState([]); // Phase 2F
   const [promotionModal, setPromotionModal] = useState({ isOpen: false, source: null, sourceItem: null });
+  const [activeSection, setActiveSection] = useState('queue');
+  const [sidebarVisible, setSidebarVisible] = useState(true);
   
   const authFailedRef = useRef(false);
 
@@ -237,27 +239,63 @@ export default function AdminDashboard() {
     }));
   };
 
-  return (
-    <div className="min-h-screen bg-mesh font-inter text-slate-300 relative pb-24">
-      {/* Ambient glows */}
-      <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-purple-500/[0.02] blur-[150px] pointer-events-none" />
-      <div className={`absolute bottom-[20%] left-0 w-[400px] h-[400px] ${'bg-yellow-500/[0.02]'} blur-[150px] pointer-events-none`} />
+  const adminNav = (close = () => {}) => (
+    <nav className="space-y-1.5">
+      <button onClick={() => { setActiveSection('queue'); close(); }} className={`sidebar-button sidebar-button-normal w-full ${activeSection === 'queue' ? 'active' : ''}`}><Inbox size={16} /> Review Queue</button>
+      <button onClick={() => { setActiveSection('golden'); close(); }} className={`sidebar-button sidebar-button-normal w-full ${activeSection === 'golden' ? 'active' : ''}`}><Sparkles size={16} /> Golden Tickets</button>
+      <button onClick={() => { setActiveSection('personal'); close(); }} className={`sidebar-button sidebar-button-normal w-full ${activeSection === 'personal' ? 'active' : ''}`}><Ticket size={16} /> Personal Tickets</button>
+      <button onClick={() => { setActiveSection('contributions'); close(); }} className={`sidebar-button sidebar-button-normal w-full ${activeSection === 'contributions' ? 'active' : ''}`}><CheckCircle size={16} /> Contributions</button>
+      <div className="pt-3 space-y-2 border-t border-white/5 mt-3">
+        <button onClick={() => { setActiveSection('settings'); close(); }} className={`sidebar-button sidebar-button-normal w-full ${activeSection === 'settings' ? 'active' : ''}`}><Settings size={16} /> Settings</button>
+        <button onClick={() => { navigate('/dashboard'); close(); }} className="sidebar-button sidebar-button-normal w-full"><BarChart2 size={16} /> User View</button>
+      </div>
+    </nav>
+  );
 
-      {/* Sticky header */}
-      <header className="sticky top-0 z-20 glass-strong px-10 py-5 border-b border-white/5 flex justify-between items-center shadow-md">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center shadow-md">
-            <span className="text-slate-100 text-xs font-black font-bricolage">A</span>
+  return (
+    <div className="flex h-screen bg-mesh font-inter text-slate-300 overflow-hidden">
+
+      {/* ── Sidebar ── */}
+      {sidebarVisible && (
+        <aside className="w-[260px] h-screen flex flex-col glass-strong border-r border-white/5 z-30 flex-shrink-0">
+          <div className="flex items-center justify-between px-5 py-6 border-b border-white/5">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center">
+                <span className="text-slate-100 text-xs font-black font-bricolage">A</span>
+              </div>
+              <span className="font-bold font-bricolage text-lg text-slate-100">Admin</span>
+            </div>
+            <button onClick={() => setSidebarVisible(false)} className="p-2 rounded-xl hover:bg-white/5 text-slate-400 hover:text-slate-100 transition-colors cursor-pointer"><X size={16} /></button>
           </div>
-          <h1 className="text-xl font-bold font-bricolage tracking-tight text-slate-100">Admin Console</h1>
-        </div>
-        <div className="flex items-center gap-6">
-          <ThemeToggle />
-          <button onClick={handleLogout} className="flex items-center gap-2 text-sm font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 transition-colors px-4 py-2 rounded-xl hover:bg-slate-100 dark:hover:bg-white/5 font-bricolage cursor-pointer">
-            <LogOut size={17} /> Logout
-          </button>
-        </div>
-      </header>
+          <div className="flex-1 overflow-y-auto px-4 py-5">{adminNav()}</div>
+          <div className="px-4 py-4 border-t border-white/5">
+            <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-slate-400 hover:text-slate-100 hover:bg-white/5 text-sm font-semibold transition-colors font-bricolage cursor-pointer"><LogOut size={16} /> Logout</button>
+          </div>
+        </aside>
+      )}
+
+      {/* ── Main content ── */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {/* Sticky header */}
+        <header className="sticky top-0 z-20 glass-strong px-8 py-5 border-b border-white/5 flex justify-between items-center shadow-md">
+          <div className="flex items-center gap-3">
+            {!sidebarVisible && (
+              <button onClick={() => setSidebarVisible(true)} className="p-2 rounded-xl hover:bg-white/5 text-slate-400 hover:text-slate-100 transition-colors cursor-pointer"><Menu size={20} /></button>
+            )}
+            <div className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center shadow-md">
+              <span className="text-slate-100 text-xs font-black font-bricolage">A</span>
+            </div>
+            <h1 className="text-xl font-bold font-bricolage tracking-tight text-slate-100">Admin Console</h1>
+          </div>
+          <div className="flex items-center gap-3">
+            <ThemeToggle />
+            {sidebarVisible && (
+              <button onClick={handleLogout} className="flex items-center gap-2 text-sm font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 transition-colors px-4 py-2 rounded-xl hover:bg-slate-100 dark:hover:bg-white/5 font-bricolage cursor-pointer">
+                <LogOut size={17} /> Logout
+              </button>
+            )}
+          </div>
+        </header>
 
       <main className="p-8 md:p-12 max-w-5xl mx-auto relative z-10 space-y-16">
         
@@ -671,6 +709,7 @@ export default function AdminDashboard() {
         </div>
 
       </main>
+      </div>
 
       <FAQPromotionModal
         isOpen={promotionModal.isOpen}
