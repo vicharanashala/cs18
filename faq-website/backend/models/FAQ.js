@@ -10,7 +10,9 @@ const faqSchema = new mongoose.Schema({
   question: { type: String, required: true },
   answer: { type: String, required: true },
 
-  viewCount: { type: Number, default: 0 },
+  viewCount:    { type: Number, default: 0 },
+  /** Separate counter for unauthenticated (guest) public views — does NOT affect engagement / reputation */
+  publicViews:  { type: Number, default: 0 },
   totalReadTime: { type: Number, default: 0 },
   averageReadTime: { type: Number, default: 0 },
   engagementScore: { type: Number, default: 0 },
