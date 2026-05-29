@@ -2,9 +2,14 @@
  * NotificationBell
  * Floating notification bell (top-right) + dropdown panel.
  * Real-time badge count, group by category, infinite scroll.
+ *
+ * Panel positioning:
+ *   - Desktop: uses position:fixed with viewport collision detection
+ *   - Anchored below bell, prefers right-aligned, flips to left if overflowing
+ *   - Always stays within the browser viewport
  */
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Bell,
@@ -153,6 +158,50 @@ export default function NotificationBell() {
   const observerRef = useRef(null);
   const loadMoreRef = useRef(null);
 
+  // Panel position: calculated on open to avoid viewport overflow
+  const [panelPos, setPanelPos] = useState({ top: 0, left: 'auto', right: 0, width: 400 });
+  const PANEL_WIDTH = 400;
+  const PANEL_MAX_HEIGHT = 480;
+  const VIEWPORT_PAD = 16;
+
+  const calculatePosition = useCallback(() => {
+    if (!bellRef.current) return;
+    const bell = bellRef.current.getBoundingClientRect();
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+
+    // Default: open below bell, right-aligned to bell's right edge
+    let left = bell.right - PANEL_WIDTH;
+    let right = 'auto';
+
+    // If no room on left, flip to open below bell, left-aligned to bell's left edge
+    if (left < VIEWPORT_PAD) {
+      left = bell.left;
+      right = 'auto';
+    }
+
+    // Clamp left to viewport
+    if (left < VIEWPORT_PAD) left = VIEWPORT_PAD;
+    // Clamp right to viewport
+    const maxRight = vw - VIEWPORT_PAD - PANEL_WIDTH;
+    if (typeof left === 'number' && left > maxRight) {
+      left = Math.max(VIEWPORT_PAD, maxRight);
+    }
+
+    // Vertical: below bell by default; if not enough room below, open above
+    const spaceBelow = vh - bell.bottom;
+    let top;
+    if (spaceBelow >= PANEL_MAX_HEIGHT + 8) {
+      top = bell.bottom + 8;
+    } else {
+      top = bell.top - PANEL_MAX_HEIGHT - 8;
+    }
+    // Clamp top
+    top = Math.max(VIEWPORT_PAD, Math.min(top, vh - PANEL_MAX_HEIGHT - VIEWPORT_PAD));
+
+    setPanelPos({ left, right, top, width: PANEL_WIDTH });
+  }, []);
+
   // Initial fetch
   useEffect(() => {
     fetchNotifications(1, true);
@@ -171,8 +220,31 @@ export default function NotificationBell() {
         setIsPanelOpen(false);
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    // Use capture phase so we catch events before they bubble
+    document.addEventListener('mousedown', handleClickOutside, { capture: true });
+    return () => document.removeEventListener('mousedown', handleClickOutside, { capture: true });
+  }, [isPanelOpen, setIsPanelOpen]);
+
+  // Recalculate position when panel opens and on window resize
+  useEffect(() => {
+    if (isPanelOpen) {
+      calculatePosition();
+      window.addEventListener('resize', calculatePosition, { passive: true });
+      window.addEventListener('scroll', calculatePosition, { passive: true, capture: true });
+    }
+    return () => {
+      window.removeEventListener('resize', calculatePosition);
+      window.removeEventListener('scroll', calculatePosition, { passive: true, capture: true });
+    };
+  }, [isPanelOpen, calculatePosition]);
+
+  // Close on escape key
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && isPanelOpen) setIsPanelOpen(false);
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isPanelOpen, setIsPanelOpen]);
 
   // Infinite scroll sentinel
@@ -253,19 +325,23 @@ export default function NotificationBell() {
         {isPanelOpen && (
           <motion.div
             ref={panelRef}
-            initial={{ opacity: 0, y: 8, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 8, scale: 0.96 }}
-            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+            initial={{ opacity: 0, scale: 0.95, y: -6 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: -6 }}
+            transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
             className="
-              absolute right-0 top-12 z-50
-              w-[400px] max-w-[calc(100vw-32px)]
+              fixed z-[100]
               bg-[#0d1117]/95 backdrop-blur-xl
               border border-white/10 rounded-2xl
-              shadow-2xl shadow-black/40
-              overflow-hidden
+              shadow-2xl shadow-black/50
             "
-            style={{ maxHeight: 'calc(100vh - 100px)' }}
+            style={{
+              top: panelPos.top,
+              left: typeof panelPos.left === 'number' ? panelPos.left : 'auto',
+              right: panelPos.right === 'auto' ? 'auto' : panelPos.right,
+              width: panelPos.width,
+              maxHeight: `${PANEL_MAX_HEIGHT}px`,
+            }}
           >
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-white/8">
