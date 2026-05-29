@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import ExpandableText from './ExpandableText';
 import { motion } from 'framer-motion';
 import { Trash2, Hash, Clock, ExternalLink } from 'lucide-react';
 import TicketStatusMiniTimeline from './TicketStatusMiniTimeline';
@@ -60,9 +61,14 @@ export default function TrackQueryCard({ ticket, redirectId, redirectType, onDel
                 <Clock size={12} /> {formattedDate}
               </span>
             </div>
-            <h4 className="text-slate-100 font-bold font-bricolage text-[0.95rem] md:text-base leading-snug line-clamp-2">
-              {ticket.question}
-            </h4>
+            <ExpandableText
+              text={ticket.question}
+              maxLines={2}
+              expandText="Read More"
+              collapseText="Show Less"
+              className="text-slate-100 font-bold font-bricolage text-[0.95rem] md:text-base leading-snug"
+              toggleClassName="mt-1"
+            />
             <div className="flex items-center gap-4 mt-3 pt-2 border-t border-white/5 flex-wrap">
               <span className="text-xs font-semibold text-slate-400 capitalize">Type: <span className="text-slate-300">{ticket.type}</span></span>
               {redirectId && (

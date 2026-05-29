@@ -36,6 +36,7 @@ function getReadTimeString(wordCount) {
 import GoldenTicketIcon from '../components/GoldenTicketIcon';
 import ThemeToggle from '../components/ThemeToggle';
 import NotificationBell from '../components/NotificationBell';
+import ExpandableText from '../components/ExpandableText';
 import SearchBar from '../components/SearchBar';
 import { formatPizzas } from '../utils/pizzaFormatter';
 
@@ -115,7 +116,7 @@ function FaqSearchResultCard({ faq, matchType, onTagClick }) {
       >
         <div className="flex flex-col gap-2 flex-1">
           <div className="flex items-center gap-3 flex-wrap">
-            <span className="text-slate-100 font-bold font-bricolage text-lg leading-snug line-clamp-2">{faq.question}</span>
+            <ExpandableText text={faq.question} maxLines={2} expandText="Read More" collapseText="Show Less" className="leading-snug" toggleClassName="mt-0.5" />
             <span className="flex items-center gap-1.5 text-[11px] font-medium text-slate-400 bg-white/[0.03] border border-white/5 px-2.5 py-1 rounded-full shadow-sm flex-shrink-0 min-w-[65px]" title="Estimated read time">
               <Hourglass size={12} className="opacity-70 text-slate-300" /> {getReadTimeString(faq.wordCount)}
             </span>
@@ -154,7 +155,7 @@ function FaqSearchResultCard({ faq, matchType, onTagClick }) {
             transition={{ duration: 0.28, ease: [0.4, 0, 0.2, 1] }} className="overflow-hidden border-t border-white/5 bg-white/[0.01]"
           >
             <div className="px-7 py-6">
-              <p className="text-slate-300 text-[0.95rem] leading-relaxed whitespace-pre-wrap line-clamp-4">{faq.answer}</p>
+              <ExpandableText text={faq.answer} maxLines={4} expandText="Read Answer" collapseText="Show Less" className="text-slate-300 text-[0.95rem] leading-relaxed whitespace-pre-wrap" toggleClassName="mt-2 text-xs" />
               <div className="flex flex-wrap gap-2 mt-6 min-h-[28px]">
                 {(faq.hashtags || []).map(tag => (
                   <button 
@@ -273,7 +274,7 @@ const FAQItem = memo(function FAQItem({ faq, expanded, onToggle, onTagClick }) {
       >
         <div className="flex flex-col md:flex-row md:items-center gap-3 pr-6 leading-snug flex-1">
           <div className="flex items-center gap-2.5 flex-wrap">
-            <span className="text-slate-300 font-medium text-[0.925rem] line-clamp-2">{faq?.question}</span>
+            <ExpandableText text={faq?.question} maxLines={2} expandText="Read More" collapseText="Show Less" className="font-medium" toggleClassName="mt-0.5" />
             <span className="flex items-center gap-1 text-[10px] font-medium text-slate-400 bg-white/[0.03] border border-white/5 px-2 py-0.5 rounded-full shadow-sm flex-shrink-0 min-w-[60px]" title="Estimated read time">
               <Hourglass size={10} className="opacity-70 text-slate-300" /> {getReadTimeString(faq?.wordCount || 0)}
             </span>
@@ -304,7 +305,7 @@ const FAQItem = memo(function FAQItem({ faq, expanded, onToggle, onTagClick }) {
             transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }} className="overflow-hidden"
           >
             <div className="px-7 pb-6 pt-2 bg-white/[0.015]">
-              <p className="text-slate-400 text-sm leading-relaxed whitespace-pre-wrap line-clamp-4">{faq?.answer}</p>
+              <ExpandableText text={faq?.answer} maxLines={4} expandText="Read Answer" collapseText="Show Less" className="text-slate-400 text-sm leading-relaxed whitespace-pre-wrap" toggleClassName="mt-2 text-xs" />
               <div className="flex flex-wrap gap-2 mt-4 min-h-[24px]">
                 {(faq?.hashtags || []).map(tag => (
                   <button 
@@ -477,8 +478,8 @@ const ClusterCard = memo(function ClusterCard({ cluster, onOpenThread, onTagClic
       {cluster.originalQuestion && (
         <div className="relative pl-4 mb-4">
           <div className={`absolute left-0 top-0 h-full w-0.5 rounded-full ${isUrgent ? 'bg-orange-500/40' : 'bg-pink-500/30'}`} />
-          <p className="text-slate-300 text-sm font-semibold line-clamp-1">"{cluster.originalQuestion}"</p>
-          <p className="text-slate-500 text-sm line-clamp-2 mt-0.5 leading-relaxed">{cluster.context}</p>
+          <ExpandableText text={`"${cluster.originalQuestion}"`} maxLines={1} expandText="Read More" collapseText="Show Less" className="text-slate-300 text-sm font-semibold" />
+          <ExpandableText text={cluster.context} maxLines={2} expandText="Read More" collapseText="Show Less" className="text-slate-500 text-sm leading-relaxed" toggleClassName="mt-0.5" />
         </div>
       )}
 

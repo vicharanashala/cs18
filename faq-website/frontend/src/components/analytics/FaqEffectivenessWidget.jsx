@@ -1,4 +1,5 @@
 import React from 'react';
+import ExpandableText from '../ExpandableText';
 import { ThumbsUp, ThumbsDown, AlertOctagon } from 'lucide-react';
 
 export default function FaqEffectivenessWidget({ data }) {
@@ -22,7 +23,14 @@ export default function FaqEffectivenessWidget({ data }) {
           
           return (
             <div key={idx} className={`p-4 rounded-2xl border ${isWarning ? 'bg-rose-500/5 border-rose-500/20' : 'bg-white/[0.015] border-white/5'}`}>
-              <h4 className="text-sm font-semibold text-slate-200 mb-3 line-clamp-2">{faq.question}</h4>
+              <ExpandableText
+                  text={faq.question}
+                  maxLines={2}
+                  expandText="Read More"
+                  collapseText="Show Less"
+                  className="text-sm font-semibold text-slate-200 mb-3"
+                  toggleClassName="text-[10px]"
+                />
               
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">

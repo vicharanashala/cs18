@@ -5,6 +5,7 @@
  */
 
 import React, { useEffect, useRef } from 'react';
+import ExpandableText from './ExpandableText';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Bell,
@@ -85,9 +86,14 @@ function NotificationItem({ notification, onMarkRead, onDelete }) {
             {relativeTime(notification.createdAt)}
           </span>
         </div>
-        <p className="text-xs text-slate-400 mt-0.5 line-clamp-2 leading-relaxed">
-          {notification.message}
-        </p>
+        <ExpandableText
+          text={notification.message}
+          maxLines={2}
+          expandText="Read More"
+          collapseText="Show Less"
+          className="text-xs text-slate-400 mt-0.5 leading-relaxed"
+          toggleClassName="text-[10px] mt-0.5"
+        />
       </div>
 
       {/* Hover actions */}
