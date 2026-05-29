@@ -1,0 +1,242 @@
+const FAQ = require('../models/FAQ');
+const SemanticCluster = require('../models/SemanticCluster');
+const getEmbedding = require('../utils/embedding');
+const { cosineSimilarity } = require('../utils/clustering');
+const { Groq } = require('groq-sdk');
+
+// ─── 1. SYNONYM MAP (Domain-Aware) ────────────────────────────────────────────
+const SYNONYMS = {
+  hostel: ['accommodation', 'stay', 'lodging', 'room', 'residence', 'housing'],
+  accommodation: ['hostel', 'stay', 'lodging', 'room', 'residence', 'housing'],
+  stay: ['hostel', 'accommodation', 'lodging', 'room'],
+  lodging: ['hostel', 'accommodation', 'stay', 'room'],
+  room: ['hostel', 'accommodation', 'stay', 'lodging'],
+  leave: ['absence', 'attendance', 'holiday', 'sick', 'vacation', 'off'],
+  absence: ['leave', 'attendance', 'holiday', 'sick', 'vacation', 'off'],
+  joining: ['onboarding', 'start date', 'reporting', 'initiation'],
+  onboarding: ['joining', 'start date', 'reporting', 'initiation'],
+  stipend: ['payment', 'salary', 'allowance', 'compensation', 'remuneration'],
+  salary: ['stipend', 'payment', 'allowance', 'compensation', 'remuneration'],
+  payment: ['stipend', 'salary', 'allowance', 'compensation', 'remuneration'],
+  noc: ['no objection', 'permission', 'certificate', 'college approval', 'noc letter'],
+  attendance: ['presence', 'session', 'class', 'absence', 'leave'],
+  vibe: ['coursework', 'modules', 'lms', 'platform', 'portal', 'class', 'lectures'],
+  lms: ['vibe', 'coursework', 'modules', 'platform', 'portal'],
+  rosetta: ['journal', 'diary', 'log', 'reflection', 'daily tracker', 'report'],
+  journal: ['rosetta', 'diary', 'log', 'reflection', 'daily tracker', 'report'],
+  team: ['group', 'partner', 'members', 'collaboration', 'formation'],
+  group: ['team', 'partner', 'members', 'collaboration', 'formation'],
+  interview: ['slot', 'reschedule', 'technical', 'hr', 'viva'],
+  offer: ['selection', 'letter', 'contract', 'results', 'email'],
+  selection: ['offer', 'letter', 'contract', 'results', 'email', 'shortlist'],
+  timing: ['schedule', 'dates', 'duration', 'hours', 'timeline', 'calendar', 'timings'],
+  dates: ['schedule', 'timing', 'duration', 'hours', 'timeline', 'calendar'],
+  certificate: ['completion', 'credentials', 'proof', 'letter of completion']
+};
+
+// ─── 2. SYNONYM EXPANSION ─────────────────────────────────────────────────────
+function expandQuery(rawQuery) {
+  const words = rawQuery.toLowerCase().split(/\s+/).filter(w => w.trim().length > 0);
+  const expanded = new Set(words);
+  for (const word of words) {
+    const syns = SYNONYMS[word] || [];
+    syns.forEach(s => {
+      s.split(/\s+/).forEach(part => expanded.add(part));
+    });
+  }
+  return Array.from(expanded).join(' ');
+}
+
+// ─── 3. GROQ NORMALIZATION ────────────────────────────────────────────────────
+async function normalizeQuery(groq, rawQuery) {
+  try {
+    const completion = await groq.chat.completions.create({
+      messages: [
+        {
+          role: 'system',
+          content:
+            'You are a strict semantic query normalizer for a FAQ search engine.\n' +
+            'Given a user query, output ONLY 3-6 highly specific retrieval tags that capture the core intent.\n' +
+            'Rules:\n' +
+            '- Output ONLY comma-separated keywords. No sentences. No explanation.\n' +
+            '- Be VERY narrow in scope. Do NOT broaden.\n' +
+            '- Infer the most likely single topic.\n' +
+            '- Example: "hostel" → hostel, accommodation, stay, room, lodging\n' +
+            '- Example: "joining date" → joining, start date, onboarding, reporting date\n' +
+            '- NEVER include unrelated terms like internship, WhatsApp, attendance when not asked.\n' +
+            'Output format: word1, word2, word3'
+        },
+        { role: 'user', content: rawQuery }
+      ],
+      model: 'llama-3.1-8b-instant',
+      temperature: 0.0,
+      max_tokens: 40
+    });
+    const tags = completion.choices[0]?.message?.content?.trim() || rawQuery;
+    console.log(`[SEARCH] Normalized "${rawQuery}" → "${tags}"`);
+    return tags;
+  } catch (err) {
+    console.warn('[SEARCH] Query normalization failed, using raw query:', err.message);
+    return rawQuery;
+  }
+}
+
+// ─── 4. CONTEXTUAL INSIGHT ────────────────────────────────────────────────────
+async function generateContextualInsight(groq, bestFaqQuestion) {
+  try {
+    const completion = await groq.chat.completions.create({
+      messages: [
+        {
+          role: 'system',
+          content:
+            'You are a minimal FAQ assistant. Given a FAQ question, write ONE short sentence (max 8 words) that acts as a natural category label for it.\n' +
+            'Rules:\n' +
+            '- Output ONLY the label sentence. Nothing else.\n' +
+            '- Must sound natural, not robotic.\n' +
+            '- Must NOT say "Showing results related to".\n' +
+            '- Must NOT be a question.\n' +
+            '- Examples:\n' +
+            '  FAQ: "Is hostel accommodation provided?" → "🏠 Hostel and accommodation information available."\n' +
+            '  FAQ: "When is the offer letter sent?" → "📄 Offer letter and confirmation FAQs available."\n' +
+            '  FAQ: "What are the attendance rules?" → "✅ Attendance and session participation policies found."'
+        },
+        { role: 'user', content: bestFaqQuestion }
+      ],
+      model: 'llama-3.1-8b-instant',
+      temperature: 0.1,
+      max_tokens: 30
+    });
+    return completion.choices[0]?.message?.content?.trim() || '';
+  } catch (err) {
+    console.warn('[SEARCH] Contextual insight generation failed:', err.message);
+    return '';
+  }
+}
+
+// ─── 5. HYBRID SCORING COMPONENTS ─────────────────────────────────────────────
+function getKeywordScore(expandedQuery, text) {
+  const queryWords = new Set(expandedQuery.toLowerCase().split(/\s+/).filter(w => w.length > 2));
+  if (queryWords.size === 0) return 0;
+  
+  const lowerText = text.toLowerCase();
+  let hits = 0;
+  for (const word of queryWords) {
+    if (lowerText.includes(word)) hits++;
+  }
+  return hits / queryWords.size;
+}
+
+function getTitleBoost(expandedQuery, title, categoryName) {
+  const queryWords = expandedQuery.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+  if (queryWords.length === 0) return 0;
+
+  const titleLower = title.toLowerCase();
+  const catLower = (categoryName || '').toLowerCase();
+  
+  let boost = 0;
+  for (const word of queryWords) {
+    if (titleLower.includes(word)) boost += 0.6;
+    if (catLower.includes(word)) boost += 0.4;
+  }
+  return Math.min(1.0, boost);
+}
+
+function meetsDynamicThreshold(semScore, kwScore) {
+  if (kwScore > 0) return semScore >= 0.72;
+  return semScore >= 0.82;
+}
+
+// ─── MAIN SEARCH HANDLER ──────────────────────────────────────────────────────
+exports.performSearch = async (req, res) => {
+  try {
+    const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+    const { query, type } = req.body;
+
+    if (!query || query.trim() === '') {
+      return res.json({ matches: [], insight: '' });
+    }
+
+    console.log(`[SEARCH] Query: "${query}", Type: ${type}`);
+
+    // Step 1: Expand Query for Keyword/Title matching
+    const expandedQuery = expandQuery(query);
+    console.log(`[SEARCH] Expanded: "${expandedQuery}"`);
+
+    // Step 2: Normalize Query for Semantic Embeddings
+    const normalizedQuery = await normalizeQuery(groq, query);
+
+    // Step 3: Embed normalized query
+    const queryEmbedding = await getEmbedding(normalizedQuery);
+    if (!queryEmbedding || queryEmbedding.length === 0) {
+      return res.status(500).json({ error: 'Failed to generate embedding for query' });
+    }
+
+    let matches = [];
+    let insight = '';
+    const TOP_N = 5;
+
+    if (type === 'faq') {
+      const faqs = await FAQ.find().populate('categoryId', 'name').lean();
+
+      const scored = faqs
+        .map(faq => {
+          const semScore = cosineSimilarity(queryEmbedding, faq.embedding);
+          const fullText = `${faq.question} ${faq.answer} ${faq.categoryId?.name || ''}`;
+          const kwScore = getKeywordScore(expandedQuery, fullText);
+          const titleBoost = getTitleBoost(expandedQuery, faq.question, faq.categoryId?.name);
+
+          const finalScore = (semScore * 0.7) + (kwScore * 0.2) + (titleBoost * 0.1);
+
+          return {
+            ...faq,
+            _semScore: semScore,
+            _kwScore: kwScore,
+            _finalScore: finalScore,
+            matchPercentage: Math.round(finalScore * 100)
+          };
+        })
+        
+        .sort((a, b) => b._finalScore - a._finalScore)
+        .slice(0, TOP_N);
+
+      matches = scored;
+
+      // Generate insight ONLY from the top match
+      if (matches.length > 0) {
+        insight = await generateContextualInsight(groq, matches[0].question);
+      }
+
+    } else if (type === 'discussion') {
+      const discussions = await SemanticCluster.find({ status: 'OPEN' }).lean();
+
+      matches = discussions
+        .map(disc => {
+          const semScore = cosineSimilarity(queryEmbedding, disc.embedding);
+          const fullText = `${disc.canonicalQuestion} ${disc.originalQuestion || ''} ${disc.context || ''}`;
+          const kwScore = getKeywordScore(expandedQuery, fullText);
+          const titleBoost = getTitleBoost(expandedQuery, disc.canonicalQuestion, '');
+
+          const finalScore = (semScore * 0.7) + (kwScore * 0.2) + (titleBoost * 0.1);
+
+          return {
+            ...disc,
+            _semScore: semScore,
+            _kwScore: kwScore,
+            _finalScore: finalScore,
+            matchPercentage: Math.round(finalScore * 100)
+          };
+        })
+        .filter(disc => meetsDynamicThreshold(disc._semScore, disc._kwScore))
+        .sort((a, b) => b._finalScore - a._finalScore)
+        .slice(0, TOP_N);
+    } else {
+      return res.status(400).json({ error: 'Invalid search type' });
+    }
+
+    res.json({ matches, insight });
+
+  } catch (err) {
+    console.error('[SEARCH ERROR]', err);
+    res.status(500).json({ error: 'Search failed' });
+  }
+};
