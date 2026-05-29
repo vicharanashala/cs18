@@ -1,13 +1,23 @@
+const AuditLog = require('../models/AuditLog');
+
 module.exports = (req, res, next) => {
   if (!req.user) {
-    console.warn(`[AUTH] Admin access denied: Missing user object. Was authMiddleware applied? Path: ${req.originalUrl}`);
-    return res.status(401).json({ success: false, error: 'Unauthorized: Missing or invalid token' });
+    return res.status(401).json({ success: false, error: 'Unauthorized' });
+  }
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ success: false, error: 'Admin access required' });
   }
 
-  if (req.user.role === 'admin') {
-    next();
-  } else {
-    console.warn(`[AUTH] Admin access denied: Insufficient role (${req.user.role}) for user ${req.user.id}. Path: ${req.originalUrl}`);
-    return res.status(403).json({ success: false, error: 'Unauthorized admin access' });
-  }
+  // Attach an audit helper pre-filled with the admin's identity
+  req.audit = {
+    adminId:    req.user.id,
+    adminEmail: req.user.email,
+    log: (opts) => AuditLog.create({
+      adminId:    req.user.id,
+      adminEmail: req.user.email,
+      ...opts,
+    }).catch(err => console.error('[AUDIT ERROR]', err.message)),
+  };
+
+  next();
 };
