@@ -4,6 +4,7 @@ import axiosClient from '../api/axiosClient';
 import toast from 'react-hot-toast';
 import Avatar from '../components/Avatar';
 import JoinedUsersAccordion from '../components/JoinedUsersAccordion';
+import BoostButton from '../components/BoostButton';
 import VariantsDropdown from '../components/VariantsDropdown';
 import {
   MessageSquare, Book, Plus, Wallet, LogOut, X, Send,
@@ -443,7 +444,7 @@ function UrgencyBadge({ cluster }) {
   );
 }
 
-const ClusterCard = memo(function ClusterCard({ cluster, onOpenThread, onTagClick }) {
+const ClusterCard = memo(function ClusterCard({ cluster, onOpenThread, onTagClick, currentUserId, pizzaSlices, onBoost }) {
   const isUrgent = cluster.isUrgent;
 
   // Defensive: search API normalizes canonicalQuestion → question, main feed uses canonicalQuestion
@@ -451,6 +452,13 @@ const ClusterCard = memo(function ClusterCard({ cluster, onOpenThread, onTagClic
 
   // Show original question section if available (main feed has originalQuestion, search API returns it too)
   const hasOriginalQuestion = cluster?.originalQuestion && cluster.originalQuestion !== displayQuestion;
+
+  // User is a participant if their ID appears in cluster.participants
+  const isParticipant = currentUserId && (cluster.participants || []).some(
+    p => (typeof p.userId === 'object' ? p.userId._id : p.userId) === currentUserId
+  );
+
+  const canBoost = !!(isParticipant && cluster.status === 'OPEN' && !['CLOSED', 'REJECTED'].includes(cluster.status));
 
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
@@ -466,7 +474,17 @@ const ClusterCard = memo(function ClusterCard({ cluster, onOpenThread, onTagClic
         <h3 className="font-bold font-bricolage text-xl text-slate-100 leading-snug group-hover:underline decoration-wavy decoration-pink-400/50 transition-all flex-1">
           {displayQuestion}
         </h3>
-        <div className="flex flex-wrap md:flex-row gap-2 self-start">
+        <div className="flex flex-wrap md:flex-row gap-2 self-start items-center">
+          {/* Boosted badge — shown when boost is active */}
+          {cluster.isBoosted && (
+            <BoostButton
+              clusterId={cluster._id}
+              isBoosted={cluster.isBoosted}
+              boostedUntil={cluster.boostedUntil}
+              canBoost={false}
+              onBoosted={onBoost}
+            />
+          )}
           {isUrgent && <UrgencyBadge cluster={cluster} />}
           {cluster?.matchPercentage && (
             <div className="flex items-center badge-pink px-3 py-1.5 rounded-full shadow-sm whitespace-nowrap">
@@ -522,9 +540,25 @@ const ClusterCard = memo(function ClusterCard({ cluster, onOpenThread, onTagClic
         totalCount={cluster.participants?.length || cluster.submissionsCount || 0}
       />
 
-      <div className={`text-xs font-semibold flex items-center gap-1.5 mt-3 border-t pt-4 ${isUrgent ? 'text-orange-400 group-hover:text-orange-300' : 'text-slate-400 group-hover:text-pink-300'} transition-colors`}>
-        <span>{isUrgent ? '⚡ Needs answers — View' : 'View Thread'}</span>
-        <ChevronRight size={13} />
+      <div className={`flex items-center justify-between mt-3 border-t pt-4 ${isUrgent ? 'text-orange-400' : 'text-slate-400'} transition-colors`}>
+        <div className={`text-xs font-semibold flex items-center gap-1.5 group-hover:${isUrgent ? 'text-orange-300' : 'text-pink-300'} transition-colors`}>
+          <span>{isUrgent ? '⚡ Needs answers — View' : 'View Thread'}</span>
+          <ChevronRight size={13} />
+        </div>
+
+        {/* Boost button — only shown when boost is NOT active and user is a participant */}
+        {!cluster.isBoosted && (
+          <div className="relative">
+            <BoostButton
+              clusterId={cluster._id}
+              isBoosted={false}
+              canBoost={canBoost}
+              pizzaSlices={pizzaSlices}
+              onBoosted={(data) => onBoost && onBoost(cluster._id, data)}
+              size="sm"
+            />
+          </div>
+        )}
       </div>
     </motion.div>
   );
@@ -613,10 +647,11 @@ function DiscussionPanel({ clusterId, user, onBack, refreshClusters, onRaiseTick
   const fetchDiscussion = async () => {
     try {
       const res = await axiosClient.get(`/discussions/clusters/${clusterId}`);
-      setCluster(res.data.cluster);
-      setAnswers(res.data.answers);
-      setAnswerCount(res.data.answerCount);
-      setConsensusLocked(res.data.consensusLocked);
+      // Spread boost fields (isBoosted, boostedUntil, boostedAt) onto cluster object
+      setCluster({ ...res.data.cluster, ...res.data });
+      setAnswers(res.data.answers || []);
+      setAnswerCount(res.data.answerCount ?? 0);
+      setConsensusLocked(res.data.consensusLocked ?? false);
       setHasAnswered(res.data.hasAnswered ?? false);
     } catch {
       toast.error('Failed to load thread');
@@ -695,15 +730,27 @@ function DiscussionPanel({ clusterId, user, onBack, refreshClusters, onRaiseTick
           <button onClick={onBack} className="flex items-center gap-2 text-sm font-semibold text-slate-400 hover:text-slate-100 transition-colors font-bricolage">
             <ChevronDown size={16} className="rotate-90" /> Back to feed
           </button>
-          {isCreator && (
-            <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2">
+            {/* Boost button — visible when viewing a cluster thread */}
+            {cluster && (
+              <BoostButton
+                clusterId={cluster._id}
+                isBoosted={cluster.isBoosted}
+                boostedUntil={cluster.boostedUntil}
+                canBoost={cluster.hasJoined || isCreator}
+                pizzaSlices={user?.pizzaSlices}
+                onBoosted={() => { if (refreshClusters) refreshClusters(); }}
+                size="md"
+              />
+            )}
+            {isCreator && (
               <button onClick={() => setShowDeleteConfirm(true)}
                 className="flex items-center gap-1.5 text-sm font-semibold badge-red px-4 py-2 hover:bg-red-950/30 rounded-xl transition-colors font-bricolage"
               >
                 <Trash2 size={14} /> Delete
               </button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
         {/* ── Urgency banner ── */}
@@ -1297,7 +1344,7 @@ export default function Dashboard() {
                       <div className="mt-10 mb-2">
                         <h3 className="font-bold font-bricolage text-lg text-slate-300 mb-4 px-2">Related Student Questions</h3>
                         <div className="grid gap-4">
-                          {discussionSearchResults.map(c => <ClusterCard key={c._id} cluster={c} onOpenThread={handleOpenCluster} onTagClick={handleSearch} />)}
+                          {discussionSearchResults.map(c => <ClusterCard key={c._id} cluster={c} onOpenThread={handleOpenCluster} onTagClick={handleSearch} currentUserId={user?._id} pizzaSlices={user?.pizzaSlices} onBoost={(id, data) => { if (data) refreshClusters(); }} />)}
                         </div>
                       </div>
                     )}
@@ -1357,6 +1404,9 @@ export default function Dashboard() {
                           cluster={cluster}
                           onOpenThread={id => { handleOpenCluster(id); setSearchQuery(''); }}
                           onTagClick={handleSearch}
+                          currentUserId={user?._id}
+                          pizzaSlices={user?.pizzaSlices}
+                          onBoost={(id, data) => { if (data) refreshClusters(); }}
                         />
                       ))}
                     </div>
@@ -1380,7 +1430,7 @@ export default function Dashboard() {
                         </button>
                       </div>
                     )}
-                    {discussionSearchResults.map(c => <ClusterCard key={c._id} cluster={c} onOpenThread={handleOpenCluster} onTagClick={handleSearch} />)}
+                    {discussionSearchResults.map(c => <ClusterCard key={c._id} cluster={c} onOpenThread={handleOpenCluster} onTagClick={handleSearch} currentUserId={user?._id} pizzaSlices={user?.pizzaSlices} onBoost={(id, data) => { if (data) refreshClusters(); }} />)}
                     
                     {!isSearching && discussionSearchResults.length > 0 && (
                       <div className="mt-6 pt-6 border-t border-white/5 flex justify-center">
@@ -1406,7 +1456,7 @@ export default function Dashboard() {
                     ) : (
                       sortedClusters
                         .filter(c => !urgentClusters.find(u => u._id === c._id))
-                        .map(c => <ClusterCard key={c._id} cluster={c} onOpenThread={handleOpenCluster} onTagClick={handleSearch} />)
+                        .map(c => <ClusterCard key={c._id} cluster={c} onOpenThread={handleOpenCluster} onTagClick={handleSearch} currentUserId={user?._id} pizzaSlices={user?.pizzaSlices} onBoost={(id, data) => { if (data) refreshClusters(); }} />)
                     )}
                   </>
                 )}

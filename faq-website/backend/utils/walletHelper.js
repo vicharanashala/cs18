@@ -83,6 +83,13 @@ async function recordTransaction({ userId, type, amount, direction, description,
     user.spurtiPoints += absAmount; // absAmount is the SP gained (always 1)
   } else if (type === 'pizza_slice_earned' || upperType === 'PIZZA_SLICE_EARNED') {
     user.pizzaSlices += absAmount;
+  } else if (upperType === 'BOOST_ACTIVATED') {
+    // Deduct 1 pizza slice for a boost
+    const slicesToCheck = metadata.pizzaSlicesSpent || 1;
+    if (user.pizzaSlices < slicesToCheck) {
+      throw new Error('Insufficient pizza slices');
+    }
+    user.pizzaSlices = Math.max(0, user.pizzaSlices - slicesToCheck);
   } else if (type === 'golden_ticket_creation') {
     if (user.spurtiPoints < absAmount) {
       throw new Error('Insufficient Spurti Points');

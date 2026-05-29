@@ -40,6 +40,9 @@ const notificationSchema = new mongoose.Schema(
         // Rewards / Gamification
         'BADGE_EARNED',
         'MILESTONE_REACHED',
+        'BOOST_ACTIVATED',
+        'BOOST_EXPIRED',
+        'GOLDEN_TICKET_CREATED',
         'REPUTATION_INCREASED',
         'TOP_CONTRIBUTOR',
         'QUERY_TRENDING',

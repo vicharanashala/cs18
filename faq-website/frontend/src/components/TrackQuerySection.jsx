@@ -5,7 +5,7 @@ import TrackQueryCard from './TrackQueryCard';
 import axiosClient from '../api/axiosClient';
 import toast from 'react-hot-toast';
 
-export default function TrackQuerySection({ refreshTrigger }) {
+export default function TrackQuerySection({ refreshTrigger, canConvertToGT, userPizzaSlices, onGTConverted }) {
   const [tickets, setTickets] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchInput, setSearchInput] = useState('');
@@ -137,6 +137,9 @@ export default function TrackQuerySection({ refreshTrigger }) {
                     redirectId={searchedRedirect?.redirectId}
                     redirectType={searchedRedirect?.redirectType}
                     onDeleteSuccess={handleRemoveTicket}
+                    canConvertToGT={canConvertToGT}
+                    userPizzaSlices={userPizzaSlices}
+                    onGTConverted={onGTConverted}
                   />
                 ) : tickets.length > 0 ? (
                   tickets.slice(0, 3).map(ticket => (
@@ -146,6 +149,9 @@ export default function TrackQuerySection({ refreshTrigger }) {
                       redirectId={ticket.redirectId}
                       redirectType={ticket.redirectType}
                       onDeleteSuccess={handleRemoveTicket}
+                      canConvertToGT={canConvertToGT}
+                      userPizzaSlices={userPizzaSlices}
+                      onGTConverted={onGTConverted}
                     />
                   ))
                 ) : (

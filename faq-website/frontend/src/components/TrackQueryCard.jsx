@@ -1,15 +1,36 @@
 import React, { useState } from 'react';
-import { motion } from 'framer-motion';
-import { Trash2, Hash, Clock, ExternalLink } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Trash2, Hash, Clock, ExternalLink, Star } from 'lucide-react';
 import TicketStatusMiniTimeline from './TicketStatusMiniTimeline';
 import DeleteTicketModal from './DeleteTicketModal';
+import BoostButton from './BoostButton';
+import ConvertToGTModal from './ConvertToGTModal';
 import Avatar from './Avatar';
 import axiosClient from '../api/axiosClient';
 import toast from 'react-hot-toast';
 
-export default function TrackQueryCard({ ticket, redirectId, redirectType, onDeleteSuccess }) {
+export default function TrackQueryCard({
+  ticket,
+  redirectId,
+  redirectType,
+  onDeleteSuccess,
+  // Eligibility flags from parent (RaiseTicket page context)
+  canConvertToGT  = false,
+  userPizzaSlices = 0,
+  onGTConverted,
+}) {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showConvertModal, setShowConvertModal] = useState(false);
+
+  const pt = ticket.personalTicket; // enriched personalTicket data from backend
+  const isPersonal    = ticket.type === 'personal';
+  const alreadyGT     = pt?.isConvertedToGT;
+  const isResolved    = ticket.status === 'resolved';
+  const isRejected    = ticket.status === 'rejected';
+  const canConvert    = canConvertToGT && isPersonal && !alreadyGT && !isResolved && !isRejected;
+  const canBoost      = isPersonal && !isResolved && !isRejected && !pt?.isBoosted;
+  const isBoostActive = !!pt?.isBoosted;
 
   const handleViewQuestion = () => {
     if (!redirectId) return;
@@ -86,7 +107,49 @@ export default function TrackQueryCard({ ticket, redirectId, redirectType, onDel
             </div>
           </div>
 
-          <div className="flex items-center justify-between md:flex-col md:items-end gap-2 w-full md:w-auto mt-4 md:mt-0">
+          <div className="flex flex-col items-end justify-between md:items-end gap-2 w-full md:w-auto mt-4 md:mt-0">
+
+            {/* Status badge */}
+            <div className="hidden md:block text-right">
+              <span className={`text-xs font-bold uppercase tracking-wider font-bricolage ${ticket.status === 'resolved' ? 'text-emerald-400' : 'text-teal-400'}`}>
+                {ticket.status.replace('_', ' ')}
+              </span>
+            </div>
+
+            {/* Boost button — always rendered for personal tickets */}
+            {isPersonal && (
+              <div className="relative">
+                <BoostButton
+                  ticketId={pt?._id}
+                  isBoosted={isBoostActive}
+                  boostedUntil={pt?.boostedUntil}
+                  canBoost={canBoost}
+                  pizzaSlices={userPizzaSlices}
+                  onBoosted={() => {}}
+                  size="sm"
+                />
+              </div>
+            )}
+
+            {/* Convert to GT button */}
+            {canConvert && (
+              <button
+                onClick={() => setShowConvertModal(true)}
+                className="flex items-center gap-1.5 text-[10px] font-bold font-bricolage px-2.5 py-1 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-300 hover:bg-purple-500/20 hover:border-purple-400/40 transition-all"
+                title="Convert this ticket to a Golden Ticket"
+              >
+                <Star size={10} />
+                <span className="hidden sm:inline">Convert to GT</span>
+                <span className="sm:hidden">GT</span>
+              </button>
+            )}
+
+            {alreadyGT && (
+              <span className="flex items-center gap-1 text-[10px] font-bold font-bricolage px-2.5 py-1 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-300">
+                <Star size={10} /> ⭐ GT
+              </span>
+            )}
+
             <button
               onClick={() => setIsDeleteModalOpen(true)}
               className="p-2 rounded-xl text-slate-500 hover:bg-red-500/10 hover:text-red-400 transition-colors border border-transparent hover:border-red-500/20"
@@ -94,11 +157,6 @@ export default function TrackQueryCard({ ticket, redirectId, redirectType, onDel
             >
               <Trash2 size={16} />
             </button>
-            <div className="hidden md:block text-right">
-              <span className={`text-xs font-bold uppercase tracking-wider font-bricolage ${ticket.status === 'resolved' ? 'text-emerald-400' : 'text-teal-400'}`}>
-                {ticket.status.replace('_', ' ')}
-              </span>
-            </div>
           </div>
         </div>
 
@@ -107,12 +165,18 @@ export default function TrackQueryCard({ ticket, redirectId, redirectType, onDel
         </div>
       </motion.div>
 
-      <DeleteTicketModal 
-        isOpen={isDeleteModalOpen} 
-        onClose={() => setIsDeleteModalOpen(false)} 
-        onConfirm={handleDelete} 
+      <DeleteTicketModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        onConfirm={handleDelete}
         isDeleting={isDeleting}
         ticketNumber={ticket.ticketNumber}
+      />
+      <ConvertToGTModal
+        isOpen={showConvertModal}
+        onClose={() => setShowConvertModal(false)}
+        ticket={ticket}
+        onSuccess={onGTConverted}
       />
     </>
   );

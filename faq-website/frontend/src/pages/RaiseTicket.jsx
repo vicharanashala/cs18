@@ -444,7 +444,14 @@ export default function RaiseTicket() {
           
           <h1 className="font-bold font-bricolage text-2xl md:text-3xl text-slate-100 mb-8">Raise a Ticket</h1>
 
-          <TrackQuerySection refreshTrigger={trackingRefresh} />
+          <TrackQuerySection
+            refreshTrigger={trackingRefresh}
+            canConvertToGT={
+              !!user && (!user.goldenTicketCooldownUntil || new Date(user.goldenTicketCooldownUntil) < new Date())
+            }
+            userPizzaSlices={user?.pizzaSlices ?? 0}
+            onGTConverted={() => {}}
+          />
 
           <div className="glass-card rounded-3xl p-6 md:p-8 border border-white/5">
             <h2 className="font-bold font-bricolage text-lg mb-4 text-slate-200">Step 1 — Search existing answers</h2>

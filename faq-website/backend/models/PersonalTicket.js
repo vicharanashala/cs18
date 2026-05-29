@@ -22,6 +22,14 @@ const personalTicketSchema = new mongoose.Schema({
   generatedTags: { type: [String], default: [] },
   spWeight: { type: Number, default: 0 },
   moderationNotes: { type: String },
+
+  // ── Boost ─────────────────────────────────────────────────────────────────
+  boostedAt:    { type: Date,   default: null, index: true },
+  boostedUntil: { type: Date,   default: null, index: true },
+
+  // ── Golden Ticket conversion ──────────────────────────────────────────────
+  isConvertedToGT: { type: Boolean, default: false },
+  goldenTicketId:  { type: mongoose.Schema.Types.ObjectId, ref: 'GoldenTicket', default: null },
 }, { timestamps: true });
 
 module.exports = mongoose.model('PersonalTicket', personalTicketSchema);

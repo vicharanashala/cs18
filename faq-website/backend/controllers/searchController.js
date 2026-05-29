@@ -28,6 +28,14 @@ function normalizeItem(item, type = 'faq') {
       joinedAt: r.joinedAt,
       question: r.question,
     }));
+    // Boost state: if boostedUntil is set and in the future, boost is active
+    const boostedUntil = item.boostedUntil ? new Date(item.boostedUntil) : null;
+    const now = new Date();
+    const isActive = boostedUntil && boostedUntil > now;
+    const boostedMs   = boostedUntil ? Math.max(0, boostedUntil.getTime() - now.getTime()) : 0;
+    const boostedSecs = Math.floor(boostedMs / 1000);
+    const boostedMins = Math.floor(boostedSecs / 60);
+
     return {
       _id:              item._id,
       question:         item.canonicalQuestion  || item.originalQuestion,
@@ -47,6 +55,11 @@ function normalizeItem(item, type = 'faq') {
       participants,
       relatedQueries,
       submissionsCount: item.submissionsCount  || 0,
+      isBoosted:        isActive,
+      boostedUntil:     isActive && boostedMs > 0
+        ? `${String(boostedMins).padStart(2, '0')}:${String(boostedSecs % 60).padStart(2, '0')}`
+        : null,
+      boostedAt:        item.boostedAt || null,
     };
   }
   if (type === 'contrib') {

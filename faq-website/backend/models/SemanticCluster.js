@@ -58,6 +58,10 @@ const semanticClusterSchema = new mongoose.Schema({
   moderationNotes:  { type: String },
   resolvedBy:       { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
 
+  // ── Boost ─────────────────────────────────────────────────────────────────
+  boostedAt:    { type: Date,   default: null, index: true },
+  boostedUntil: { type: Date,   default: null, index: true },
+
   // ── Audit log ────────────────────────────────────────────────────────────
   history: [{
     event:    { type: String },

@@ -17,6 +17,7 @@ const transactionSchema = new mongoose.Schema({
       'SYSTEM_ADJUSTMENT',
       'golden_ticket_creation',
       'pizza_redemption',
+      'BOOST_ACTIVATED',
       'REDEEM'
     ], 
     required: true 

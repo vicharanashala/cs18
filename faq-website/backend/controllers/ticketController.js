@@ -1,5 +1,6 @@
 const Ticket = require('../models/Ticket');
 const Submission = require('../models/Submission');
+const PersonalTicket = require('../models/PersonalTicket');
 const ticketService = require('../services/ticket.service');
 
 exports.createTicket = async (req, res) => {
@@ -55,11 +56,13 @@ exports.getUserTickets = async (req, res) => {
     const tickets = await Ticket.find({ userId: req.user.id })
       .sort({ createdAt: -1 })
       .lean();
-    
-    // Compute redirectId/redirectType for each ticket
+
+    // Compute redirectId/redirectType and enrich with personalTicket data for 'personal' type
     const ticketsWithRedirect = await Promise.all(tickets.map(async (ticket) => {
       let redirectId = null;
       let redirectType = null;
+      let personalTicket = null;
+
       if (ticket.type === 'general') {
         const submission = await Submission.findById(ticket.referenceId).select('clusterId').lean();
         if (submission) {
@@ -69,12 +72,38 @@ exports.getUserTickets = async (req, res) => {
       } else if (ticket.type === 'personal') {
         redirectId = ticket.referenceId ? ticket.referenceId.toString() : null;
         redirectType = 'personal';
+        // Fetch personal ticket for boost status and GT conversion eligibility
+        if (ticket.referenceId) {
+          const pt = await PersonalTicket.findById(ticket.referenceId).lean();
+          if (pt) {
+            const now = new Date();
+            const isBoosted = pt.boostedUntil && new Date(pt.boostedUntil) > now;
+            const boostedUntil = pt.boostedUntil ? new Date(pt.boostedUntil) : null;
+            const boostedMs   = boostedUntil ? Math.max(0, boostedUntil.getTime() - now.getTime()) : 0;
+            const boostedSecs = Math.floor(boostedMs / 1000);
+            const boostedMins = Math.floor(boostedSecs / 60);
+
+            personalTicket = {
+              _id:                  pt._id,
+              question:             pt.question,
+              status:               pt.status,
+              isConvertedToGT:      pt.isConvertedToGT || false,
+              goldenTicketId:       pt.goldenTicketId   || null,
+              isBoosted:            isBoosted,
+              boostedUntil:         isBoosted && boostedMs > 0
+                ? `${String(boostedMins).padStart(2, '0')}:${String(boostedSecs % 60).padStart(2, '0')}`
+                : null,
+              boostedAt:            pt.boostedAt || null,
+            };
+          }
+        }
       }
-      return { ...ticket, redirectId, redirectType };
+      return { ...ticket, redirectId, redirectType, personalTicket };
     }));
-      
+
     res.json({ success: true, tickets: ticketsWithRedirect });
   } catch (err) {
+    console.error('[getUserTickets]', err);
     res.status(500).json({ error: 'Failed fetching user tickets' });
   }
 };

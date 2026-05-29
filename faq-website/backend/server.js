@@ -11,6 +11,7 @@ const answerRoutes = require("./routes/answerRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const rewardRoutes = require("./routes/rewardRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
+const boostRoutes = require("./routes/boostRoutes");
 
 const errorMiddleware = require("./middleware/errorMiddleware");
 
@@ -99,6 +100,7 @@ app.use("/api/rewards", rewardRoutes);
 app.use("/api/wallet", require("./routes/walletRoutes"));
 app.use("/api/search", require("./routes/searchRoutes"));
 app.use("/api/golden-tickets", require("./routes/goldenTicketRoutes"));
+app.use("/api/boost", require("./routes/boostRoutes"));
 app.use("/api/personal-issues", require("./routes/personalIssueRoutes"));
 app.use("/api/tickets", require("./routes/ticketRoutes"));
 app.use("/api/analytics", require("./routes/analyticsRoutes"));

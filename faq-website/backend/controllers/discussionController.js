@@ -195,22 +195,55 @@ exports.getClusters = async (req, res, next) => {
   try {
     const SemanticCluster = require('../models/SemanticCluster');
 
+    // ── Auto-cleanup expired boosts ──────────────────────────────────────────
+    const now = new Date();
+    await SemanticCluster.updateMany(
+      { boostedUntil: { $lt: now } },
+      { $set: { boostedUntil: null, boostedAt: null } }
+    );
+
     await recalcUrgency();
 
     let clusters = await SemanticCluster.find({ status: 'OPEN' })
-      .sort({ isUrgent: -1, createdAt: -1 })
+      .sort({ isUrgent: -1, boostedAt: -1, createdAt: -1 })
       .select('-embedding')
       .populate('participants.userId', '_id username email reputation')
       .populate('relatedQueries.userId', '_id username email reputation')
       .lean();
 
     // Attach variants count and ensure relatedQueries exists
-    clusters = clusters.map(c => ({
-      ...c,
-      variantsCount: (c.relatedQueries || []).length,
-      _groupedCount: 1,
-      _groupedVariants: [],
-    }));
+    clusters = clusters.map(c => {
+      const isActive = c.boostedUntil && new Date(c.boostedUntil) > now;
+      const boostedUntil = c.boostedUntil ? new Date(c.boostedUntil) : null;
+      const boostedMs    = boostedUntil ? Math.max(0, boostedUntil.getTime() - now.getTime()) : 0;
+      const boostedSecs  = Math.floor(boostedMs / 1000);
+      const boostedMins  = Math.floor(boostedSecs / 60);
+
+      return {
+        ...c,
+        isBoosted:   isActive,
+        boostedUntil: isActive && boostedMs > 0
+          ? `${String(boostedMins).padStart(2, '0')}:${String(boostedSecs % 60).padStart(2, '0')}`
+          : null,
+        variantsCount: (c.relatedQueries || []).length,
+        _groupedCount: 1,
+        _groupedVariants: [],
+      };
+    });
+
+    // Sort: boosted first (newest boostedAt first), then golden tickets, then normal
+    clusters.sort((a, b) => {
+      const aActive = a.isBoosted ? 2 : (a.status === 'ADMIN_REVIEW' ? 1 : 0);
+      const bActive = b.isBoosted ? 2 : (b.status === 'ADMIN_REVIEW' ? 1 : 0);
+      if (aActive !== bActive) return bActive - aActive;
+      if (a.isBoosted && b.isBoosted) {
+        // Most recently boosted first
+        const aTime = a.boostedAt ? new Date(a.boostedAt).getTime() : 0;
+        const bTime = b.boostedAt ? new Date(b.boostedAt).getTime() : 0;
+        return bTime - aTime;
+      }
+      return 0;
+    });
 
     // Deduplicate: collapse semantically near-identical questions into one card
     // using hybrid n-gram + token-overlap similarity
@@ -280,12 +313,18 @@ exports.getClusterById = async (req, res, next) => {
       consensusLocked: cluster.consensusLocked,
     }));
 
+    const now       = new Date();
+    const isBoosted = !!(cluster.boostedUntil && new Date(cluster.boostedUntil) > now);
+
     res.json({
       cluster,
       answers: cluster.annotatedAnswers,
       answerCount: cluster.answerCount,
       consensusLocked: cluster.consensusLocked,
       hasAnswered: cluster.hasAnswered,
+      isBoosted,
+      boostedUntil: isBoosted ? cluster.boostedUntil : null,
+      boostedAt:    cluster.boostedAt    || null,
     });
   } catch (err) {
     next(err);
