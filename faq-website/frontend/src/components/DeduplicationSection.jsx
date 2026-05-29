@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import ExpandableText from './ExpandableText';
 import axiosClient from '../api/axiosClient';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -249,14 +248,9 @@ export default function DeduplicationSection() {
                     <div className="text-[11px] font-bold text-green-400 uppercase tracking-widest mb-1 font-bricolage">
                       ✓ Master
                     </div>
-                    <ExpandableText
-                      text={(pair.master.canonicalQuestion || pair.master.rawQuestion || '(no question)')}
-                      maxLines={2}
-                      expandText="Read More"
-                      collapseText="Show Less"
-                      className="text-sm font-semibold font-bricolage text-slate-200 leading-snug"
-                      toggleClassName="text-[10px]"
-                    />
+                    <p className="text-sm font-semibold font-bricolage text-slate-200 leading-snug break-words whitespace-normal">
+                      {pair.master.canonicalQuestion || pair.master.rawQuestion || '(no question)'}
+                    </p>
                     <div className="flex gap-3 mt-1.5 text-[10px] text-slate-500">
                       <span>👥 {pair.masterStats?.participants || 0}</span>
                       <span>📝 {pair.masterStats?.submissionsCount || 0}</span>
@@ -274,14 +268,9 @@ export default function DeduplicationSection() {
                     <div className="text-[11px] font-bold text-orange-400 uppercase tracking-widest mb-1 font-bricolage">
                       ↳ Duplicate
                     </div>
-                    <ExpandableText
-                      text={(pair.duplicate.canonicalQuestion || pair.duplicate.rawQuestion || '(no question)')}
-                      maxLines={2}
-                      expandText="Read More"
-                      collapseText="Show Less"
-                      className="text-sm font-semibold font-bricolage text-slate-400 italic"
-                      toggleClassName="text-[10px]"
-                    />
+                    <p className="text-sm font-semibold font-bricolage text-slate-400 italic break-words whitespace-normal">
+                      {pair.duplicate.canonicalQuestion || pair.duplicate.rawQuestion || '(no question)'}
+                    </p>
                     <div className="flex gap-3 mt-1.5 text-[10px] text-slate-600">
                       <span>👥 {pair.dupStats?.participants || 0}</span>
                       <span>📝 {pair.dupStats?.submissionsCount || 0}</span>

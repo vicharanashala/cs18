@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import ExpandableText from './ExpandableText';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown, ChevronUp, UserCheck, Link2, Clock } from 'lucide-react';
 import Avatar from './Avatar';
@@ -112,14 +111,9 @@ export default function JoinedUsersAccordion({ participants = [], relatedQueries
                       </div>
                       {/* Their typed question variant */}
                       {entry.question && entry.question !== user.question && (
-                        <ExpandableText
-                          text={`"${entry.question}"`}
-                          maxLines={2}
-                          expandText="Read More"
-                          collapseText="Show Less"
-                          className="text-[11px] text-slate-500 italic leading-relaxed"
-                          toggleClassName="mt-0.5 text-[10px]"
-                        />
+                        <p className="text-[11px] text-slate-500 italic leading-relaxed break-words whitespace-normal mt-0.5">
+                          "{entry.question}"
+                        </p>
                       )}
                     </div>
                     {timeStr && (

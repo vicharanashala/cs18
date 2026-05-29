@@ -36,7 +36,6 @@ function getReadTimeString(wordCount) {
 import GoldenTicketIcon from '../components/GoldenTicketIcon';
 import ThemeToggle from '../components/ThemeToggle';
 import NotificationBell from '../components/NotificationBell';
-import ExpandableText from '../components/ExpandableText';
 import SearchBar from '../components/SearchBar';
 import { formatPizzas } from '../utils/pizzaFormatter';
 
@@ -111,12 +110,11 @@ function FaqSearchResultCard({ faq, matchType, onTagClick }) {
   const [expanded, setExpanded] = useState(false);
   return (
     <div className="glass-card rounded-3xl overflow-hidden mb-4 border border-white/5">
-      <button onClick={() => setExpanded(e => !e)}
-        className="w-full flex flex-col md:flex-row md:items-center justify-between px-7 py-5 hover:bg-white/[0.02] transition-colors gap-4 text-left"
-      >
+      {/* Header row — outer div, expand/collapse is a separate button */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between px-7 py-5 gap-4">
         <div className="flex flex-col gap-2 flex-1">
           <div className="flex items-center gap-3 flex-wrap">
-            <ExpandableText text={faq.question} maxLines={2} expandText="Read More" collapseText="Show Less" className="leading-snug" toggleClassName="mt-0.5" />
+            <p className="leading-snug break-words whitespace-normal font-medium text-slate-100">{faq.question}</p>
             <span className="flex items-center gap-1.5 text-[11px] font-medium text-slate-400 bg-white/[0.03] border border-white/5 px-2.5 py-1 rounded-full shadow-sm flex-shrink-0 min-w-[65px]" title="Estimated read time">
               <Hourglass size={12} className="opacity-70 text-slate-300" /> {getReadTimeString(faq.wordCount)}
             </span>
@@ -140,27 +138,32 @@ function FaqSearchResultCard({ faq, matchType, onTagClick }) {
           </div>
         </div>
         <div className="flex items-center gap-3 self-start md:self-auto flex-shrink-0">
-          {/* Only show semantic match % for semantic results, not keyword hits */}
           {matchType === 'semantic' && faq.matchPercentage && (
             <span className="text-[10px] font-bold font-bricolage badge-purple px-3 py-1.5 rounded-full shadow-sm">
               {faq.matchPercentage}% semantic match
             </span>
           )}
-          {expanded ? <ChevronUp size={18} className="text-slate-500" /> : <ChevronDown size={18} className="text-slate-500" />}
+          <button
+            onClick={() => setExpanded(e => !e)}
+            className="p-1.5 rounded-lg hover:bg-white/5 transition-colors text-slate-400 hover:text-slate-200"
+            aria-label={expanded ? 'Collapse' : 'Expand'}
+          >
+            {expanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+          </button>
         </div>
-      </button>
+      </div>
       <AnimatePresence initial={false}>
         {expanded && (
           <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.28, ease: [0.4, 0, 0.2, 1] }} className="overflow-hidden border-t border-white/5 bg-white/[0.01]"
+            transition={{ duration: 0.28, ease: [0.4, 0, 0.2, 1] }} className="border-t border-white/5 bg-white/[0.01]"
           >
             <div className="px-7 py-6">
-              <ExpandableText text={faq.answer} maxLines={4} expandText="Read Answer" collapseText="Show Less" className="text-slate-300 text-[0.95rem] leading-relaxed whitespace-pre-wrap" toggleClassName="mt-2 text-xs" />
+              <p className="text-slate-300 text-[0.95rem] leading-relaxed whitespace-pre-wrap break-words">{faq.answer}</p>
               <div className="flex flex-wrap gap-2 mt-6 min-h-[28px]">
                 {(faq.hashtags || []).map(tag => (
-                  <button 
+                  <button
                     key={tag}
-                    onClick={(e) => { e.stopPropagation(); if (onTagClick) onTagClick(tag); }}
+                    onClick={() => { if (onTagClick) onTagClick(tag); }}
                     className="font-bricolage text-[11px] font-semibold inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border transition-all hover:-translate-y-0.5 bg-pink-500/10 dark:bg-pink-500/10 text-pink-600 dark:text-pink-400 border-pink-500/20 dark:border-pink-500/20 hover:bg-pink-500/20 hover:shadow-sm"
                   >
                     #{tag}
@@ -269,17 +272,16 @@ const FAQItem = memo(function FAQItem({ faq, expanded, onToggle, onTagClick }) {
 
   return (
     <div ref={faqRef} className="bg-white/[0.005]">
-      <button onClick={onToggle}
-        className="w-full flex items-center justify-between px-7 py-4 text-left hover:bg-white/[0.01] transition-colors"
-      >
+      {/* Header row — outer div, expand/collapse is a separate button */}
+      <div className="flex items-center justify-between px-7 py-4">
         <div className="flex flex-col md:flex-row md:items-center gap-3 pr-6 leading-snug flex-1">
           <div className="flex items-center gap-2.5 flex-wrap">
-            <ExpandableText text={faq?.question} maxLines={2} expandText="Read More" collapseText="Show Less" className="font-medium" toggleClassName="mt-0.5" />
+            <p className="break-words whitespace-normal font-medium text-slate-100">{faq?.question}</p>
             <span className="flex items-center gap-1 text-[10px] font-medium text-slate-400 bg-white/[0.03] border border-white/5 px-2 py-0.5 rounded-full shadow-sm flex-shrink-0 min-w-[60px]" title="Estimated read time">
               <Hourglass size={10} className="opacity-70 text-slate-300" /> {getReadTimeString(faq?.wordCount || 0)}
             </span>
           </div>
-          <div className="flex items-center gap-1.5 flex-wrap mt-1.5 md:mt-0">
+          <div className="flex items-center gap-1.5 flex-wrap">
             {faq.recentViewsBoost > 1.5 && (
               <span className="inline-flex items-center gap-1 trending-badge px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider font-bricolage">
                 <Flame size={10} className="animate-pulse" /> Trending
@@ -297,20 +299,26 @@ const FAQItem = memo(function FAQItem({ faq, expanded, onToggle, onTagClick }) {
             )}
           </div>
         </div>
-        {expanded ? <ChevronUp size={16} className="text-slate-500 flex-shrink-0" /> : <ChevronDown size={16} className="text-slate-500 flex-shrink-0" />}
-      </button>
+        <button
+          onClick={onToggle}
+          className="p-1.5 rounded-lg hover:bg-white/5 transition-colors text-slate-400 hover:text-slate-200 flex-shrink-0"
+          aria-label={expanded ? 'Collapse' : 'Expand'}
+        >
+          {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+        </button>
+      </div>
       <AnimatePresence initial={false}>
         {expanded && (
           <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }} className="overflow-hidden"
+            transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
           >
             <div className="px-7 pb-6 pt-2 bg-white/[0.015]">
-              <ExpandableText text={faq?.answer} maxLines={4} expandText="Read Answer" collapseText="Show Less" className="text-slate-400 text-sm leading-relaxed whitespace-pre-wrap" toggleClassName="mt-2 text-xs" />
+              <p className="text-slate-300 text-sm leading-relaxed whitespace-pre-wrap break-words">{faq?.answer}</p>
               <div className="flex flex-wrap gap-2 mt-4 min-h-[24px]">
                 {(faq?.hashtags || []).map(tag => (
-                  <button 
+                  <button
                     key={tag}
-                    onClick={(e) => { e.stopPropagation(); if (onTagClick) onTagClick(tag); }}
+                    onClick={() => { if (onTagClick) onTagClick(tag); }}
                     className="font-bricolage text-[10px] font-semibold inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border transition-all hover:-translate-y-0.5 bg-pink-500/10 dark:bg-pink-500/10 text-pink-600 dark:text-pink-400 border-pink-500/20 dark:border-pink-500/20 hover:bg-pink-500/20 hover:shadow-sm"
                   >
                     #{tag}
@@ -478,8 +486,8 @@ const ClusterCard = memo(function ClusterCard({ cluster, onOpenThread, onTagClic
       {cluster.originalQuestion && (
         <div className="relative pl-4 mb-4">
           <div className={`absolute left-0 top-0 h-full w-0.5 rounded-full ${isUrgent ? 'bg-orange-500/40' : 'bg-pink-500/30'}`} />
-          <ExpandableText text={`"${cluster.originalQuestion}"`} maxLines={1} expandText="Read More" collapseText="Show Less" className="text-slate-300 text-sm font-semibold" />
-          <ExpandableText text={cluster.context} maxLines={2} expandText="Read More" collapseText="Show Less" className="text-slate-500 text-sm leading-relaxed" toggleClassName="mt-0.5" />
+          <p className="text-slate-300 text-sm font-semibold break-words whitespace-normal">"{cluster.originalQuestion}"</p>
+          <p className="text-slate-500 text-sm leading-relaxed break-words whitespace-normal">{cluster.context}</p>
         </div>
       )}
 
