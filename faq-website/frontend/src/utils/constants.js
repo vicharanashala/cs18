@@ -1,19 +1,3 @@
-export const FAQ_CATEGORIES = [
-  "About the internship",
-  "Timing and dates",
-  "NOC (No Objection Certificate)",
-  "Selection, offer letter, and certificate",
-  "Work, mentorship, and projects",
-  "Code of conduct — communication channels",
-  "Interviews Related",
-  "Certificate",
-  "Rosetta — your internship journal",
-  "Phase 1 — coursework, Vibe LMS, and live sessions",
-  "Yaksha Chat Related",
-  "ViBe Platform",
-  "Team Formation",
-  "Other"
-];
 
 export const CATEGORY_ALIASES = {
   "Selection offer letter and certificate": "Selection, offer letter, and certificate",
@@ -31,10 +15,7 @@ export const CATEGORY_ALIASES = {
 
 export function normalizeCategory(oldName) {
   if (!oldName || typeof oldName !== 'string') return "Other";
-  
-  // Exact match (case insensitive)
-  const exactMatch = FAQ_CATEGORIES.find(c => c.toLowerCase() === oldName.toLowerCase());
-  if (exactMatch) return exactMatch;
+
 
   // Alias match
   const aliasMatch = Object.keys(CATEGORY_ALIASES).find(

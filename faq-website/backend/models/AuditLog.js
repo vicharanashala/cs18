@@ -5,7 +5,8 @@
 const mongoose = require('mongoose');
 
 const auditLogSchema = new mongoose.Schema({
-  adminId:    { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  adminId:    { type: mongoose.Schema.Types.ObjectId, refPath: 'adminType', default: null },
+  adminType:  { type: String, enum: ['Admin', 'User'], default: 'Admin' },
   adminEmail: { type: String, required: true },
 
   action: {
@@ -14,11 +15,11 @@ const auditLogSchema = new mongoose.Schema({
     enum: [
       // User management
       'USER_BANNED', 'USER_UNBANNED',
-      'USER_RESTRICTED', 'USER_UNRESTRICTED',
+      'USER_SUSPENDED',
       'USER_ROLE_CHANGED',
-      'PIZZA_GRANTED', 'PIZZA_REVOKED',
+      'PIZZA_GRANTED', 'PIZZA_REVOKED', 'PIZZA_SET', 'PIZZA_RESET',
       'PIZZA_MIGRATION_APPLIED',
-      'SPURTI_GRANTED', 'SPURTI_REVOKED',
+      'SPURTI_GRANTED', 'SPURTI_REVOKED', 'SPURTI_SET',
       'REPUTATION_ADJUSTED',
       'GT_COOLDOWN_RESET',
       // FAQ CRUD
@@ -36,6 +37,8 @@ const auditLogSchema = new mongoose.Schema({
       'GT_RESOLVED', 'GT_REJECTED',
       // Personal Ticket
       'TICKET_RESOLVED', 'TICKET_REJECTED',
+      'TICKET_BOOSTED', 'TICKET_BOOST_EXPIRED', 'TICKET_CONVERTED_TO_GOLDEN',
+      'PIZZA_SLICE_SPENT',
       // Settings
       'SETTINGS_UPDATED',
     ],
@@ -56,6 +59,7 @@ const auditLogSchema = new mongoose.Schema({
 
 // Indexes for efficient query patterns used by the admin audit log viewer
 auditLogSchema.index({ adminId: 1, timestamp: -1 });
+auditLogSchema.index({ adminType: 1, adminId: 1 });
 auditLogSchema.index({ targetType: 1, targetId: 1 });
 auditLogSchema.index({ action: 1, timestamp: -1 });
 auditLogSchema.index({ timestamp: -1 });

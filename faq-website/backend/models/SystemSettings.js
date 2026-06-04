@@ -33,6 +33,18 @@ const systemSettingsSchema = new mongoose.Schema({
     default: false,
   },
 
+  /** Bee (Voice Assistant) System Prompt */
+  beeSystemPrompt: {
+    type: String,
+    default: "You are Bee, a helpful AI assistant for students. Be concise and polite.",
+  },
+
+  /** Whether the Bee assistant is active */
+  beeEnabled: {
+    type: Boolean,
+    default: true,
+  },
+
   updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
 }, { timestamps: true });
 

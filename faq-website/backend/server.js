@@ -3,6 +3,7 @@ const mongoose = require("mongoose");
 const cors = require("cors");
 const http = require("http");
 const { Server } = require("socket.io");
+const path = require("path");
 require("dotenv").config();
 
 const authRoutes = require("./routes/authRoutes");
@@ -78,12 +79,11 @@ app.use(
       }
     },
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-request-id']
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-request-id'],
+    optionsSuccessStatus: 204,
   })
 );
-
-app.options(/.*/, cors()); // Enable pre-flight for all routes
 
 app.use(express.json());
 
@@ -106,6 +106,21 @@ app.use("/api/tickets", require("./routes/ticketRoutes"));
 app.use("/api/analytics", require("./routes/analyticsRoutes"));
 app.use("/api/intelligence", require("./routes/intelligenceRoutes"));
 app.use("/api/notifications", notificationRoutes);
+app.use("/api/uploads", require("./routes/uploadRoutes"));
+app.use("/api/user-management", require("./routes/userManagementRoutes"));
+app.use("/api/ai", require("./routes/aiRoutes"));
+app.use("/api/bee", require("./routes/beeRoutes"));
+
+/* =========================
+   CRON JOBS
+========================= */
+const { initSeverityCron } = require("./cron/severityCron");
+initSeverityCron();
+
+/* =========================
+   STATIC UPLOADS  (serve uploaded files publicly)
+========================= */
+app.use('/uploads', express.static(path.resolve(__dirname, 'uploads')));
 
 /* =========================
    HEALTH CHECK
@@ -192,26 +207,7 @@ mongoose
       );
     }
 
-    /* =========================
-       CATEGORY SYNC
-    ========================= */
 
-    try {
-      const Category = require("./models/Category");
-      const { FAQ_CATEGORIES } = require("./utils/constants");
-
-      for (const name of FAQ_CATEGORIES) {
-        await Category.findOneAndUpdate(
-          { name },
-          { name, isActive: true },
-          { upsert: true }
-        );
-      }
-
-      console.log("[MIGRATION] Categories synced.");
-    } catch (migErr) {
-      console.error("[MIGRATION ERROR] Category sync failed:", migErr);
-    }
 
     /* =========================
        HASHTAG BACKFILL

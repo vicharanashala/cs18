@@ -28,7 +28,7 @@ export default function SearchFailureWidget({ data }) {
       </div>
 
       <div className="space-y-3 relative z-10">
-        {data.map((item, idx) => (
+        {(data || []).map((item, idx) => (
           <div
             key={idx}
             className={`flex items-center justify-between p-4 rounded-2xl bg-white/[0.015] border border-white/5 ${hoverClass} transition-all`}
@@ -43,7 +43,7 @@ export default function SearchFailureWidget({ data }) {
             </div>
           </div>
         ))}
-        {data.length === 0 && (
+        {(!data || data.length === 0) && (
           <div className="text-slate-500 text-sm font-medium w-full text-center py-6 border border-dashed border-white/10 rounded-2xl">
             No search failures! Students are finding what they need.
           </div>

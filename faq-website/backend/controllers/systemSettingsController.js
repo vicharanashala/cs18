@@ -56,6 +56,8 @@ exports.getSettings = async (req, res) => {
         publicFAQEnabled:            settings.publicFAQEnabled,
         guestFAQSearchEnabled:       settings.guestFAQSearchEnabled,
         guestAnalyticsTrackingEnabled: settings.guestAnalyticsTrackingEnabled,
+        beeSystemPrompt:             settings.beeSystemPrompt,
+        beeEnabled:                  settings.beeEnabled,
         updatedBy:                   updatedByEmail,
         updatedAt:                   settings.updatedAt,
       },
@@ -63,6 +65,50 @@ exports.getSettings = async (req, res) => {
   } catch (err) {
     console.error('[systemSettings] getSettings error:', err);
     return res.status(500).json({ success: false, error: 'Failed to load settings.' });
+  }
+};
+
+// ─── Voice Assistant Settings ────────────────────────────────────────────────
+
+exports.updateBeeSettings = async (req, res) => {
+  try {
+    const { beeSystemPrompt, beeEnabled } = req.body;
+    const settings = await getGlobalSettings();
+    const changes = {};
+
+    if (beeSystemPrompt !== undefined) {
+      settings.beeSystemPrompt = beeSystemPrompt;
+      changes.beeSystemPrompt = beeSystemPrompt;
+    }
+    if (beeEnabled !== undefined) {
+      settings.beeEnabled = Boolean(beeEnabled);
+      changes.beeEnabled = beeEnabled;
+    }
+
+    if (Object.keys(changes).length === 0) {
+      return res.status(400).json({ success: false, error: 'No valid fields provided.' });
+    }
+
+    settings.updatedBy = req.admin.adminId;
+    await settings.save();
+
+    await logAction(
+      req,
+      'BEE_SETTINGS_UPDATED',
+      settings._id.toString(),
+      'SystemSettings',
+      `Voice assistant settings updated`,
+      changes,
+    );
+
+    return res.json({
+      success: true,
+      message: 'Voice assistant settings updated successfully.',
+      ...changes,
+    });
+  } catch (err) {
+    console.error('[systemSettings] updateBeeSettings error:', err);
+    return res.status(500).json({ success: false, error: 'Failed to update Bee settings.' });
   }
 };
 

@@ -22,16 +22,16 @@ export default function Login() {
       localStorage.setItem('role', res.data.user.role);
       
       if (res.data.user.role === 'admin') {
-        toast.success('Admin Login Successful');
+        toast.success('Admin Login Successful', { id: 'auth-toast' });
         navigate('/admin');
       } else {
-        toast.success('Login Successful');
+        toast.success('Login Successful', { id: 'auth-toast' });
         navigate('/dashboard');
       }
     } catch (err) {
       const msg = err.response?.data?.message || 'Login failed. Backend is unreachable.';
       setErrorMsg(msg);
-      toast.error(msg);
+      toast.error(msg, { id: 'auth-toast' });
     } finally {
       setLoading(false);
     }

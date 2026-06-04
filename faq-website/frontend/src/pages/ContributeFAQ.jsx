@@ -3,8 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import axiosClient from '../api/axiosClient';
 import toast from 'react-hot-toast';
 import {
-  MessageSquare, Book, Wallet, LogOut, X, Sparkles, Check, Plus, Menu, Pizza
-} from 'lucide-react';
+  MessageSquare, Wallet, LogOut, X, Sparkles, Check, Plus, Menu, Pizza
+, Book } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import GoldenTicketIcon from '../components/GoldenTicketIcon';
 import BannedUserBanner from '../components/BannedUserBanner';
@@ -12,7 +12,9 @@ import ThemeToggle from '../components/ThemeToggle';
 import { formatPizzas } from '../utils/pizzaFormatter';
 import Avatar from '../components/Avatar';
 import CategoryDropdown, { FALLBACK_CATEGORIES } from '../components/CategoryDropdown';
+import AttachmentUpload from '../components/AttachmentUpload';
 import { useBannedTheme } from '../hooks/useBannedTheme';
+import StaffToolsNav from '../components/StaffToolsNav';
 
 export default function ContributeFAQ() {
   const [user, setUser] = useState(null);
@@ -29,6 +31,7 @@ export default function ContributeFAQ() {
   const [isContributing, setIsContributing] = useState(false);
   const [contribResult, setContribResult] = useState(null); // { generatedQuestion, generatedAnswer }
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [contribAttachments, setContribAttachments] = useState([]);
 
   useEffect(() => {
     axiosClient.get('/auth/me').then(r => setUser(r.data.user)).catch(() => { });
@@ -60,6 +63,7 @@ export default function ContributeFAQ() {
         customCategory: contribCustomCategory,
         question: contribQuestion,
         answer: contribAnswer,
+        attachments: contribAttachments,
       });
       setContribResult(res.data.contribution);
       toast.success('FAQ contributed! Thank you for helping the community.');
@@ -67,6 +71,7 @@ export default function ContributeFAQ() {
       setContribAnswer('');
       setContribCategory('');
       setContribCustomCategory('');
+      setContribAttachments([]);
     } catch (err) {
       if (err.response?.data?.duplicate) {
         toast.error('A similar FAQ already exists in the knowledge base.');
@@ -95,7 +100,7 @@ export default function ContributeFAQ() {
 
   const navSection = (close = () => { }) => (
     <nav className="space-y-1.5">
-      <NavItem icon={Book} label="FAQ" active={false} onClick={() => { navigate('/faq'); close(); }} />
+      <NavItem icon={Book} label="FAQ" active={false} onClick={() => { navigate('/faqs'); close(); }} />
       <NavItem icon={MessageSquare} label="Once Asked Questions" active={false} onClick={() => { navigate('/discussions'); close(); }} />
       <NavItem icon={Wallet} label="Wallet" active={false} onClick={() => { navigate('/wallet'); close(); }} />
       <div className="pt-3 space-y-2 border-t border-white/5 mt-3">
@@ -117,6 +122,7 @@ export default function ContributeFAQ() {
           <span className="drop-shadow-md tracking-wide">Golden Ticket</span>
         </button>
       </div>
+      <StaffToolsNav close={close} />
     </nav>
   );
 
@@ -168,10 +174,10 @@ export default function ContributeFAQ() {
         <div>
           <div className="flex items-center justify-between mb-10 px-2">
             <div className="flex items-center gap-2.5 cursor-pointer" onClick={() => navigate('/dashboard')}>
-              <div className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center shadow-md transition-colors hover:bg-white/10">
-                <Book size={16} className="text-slate-300" strokeWidth={2} />
-              </div>
-              <span className="font-bold font-bricolage text-xl text-slate-100 tracking-tight">FAQ Hive</span>
+              <div className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center">
+              <Book size={16} className="text-slate-300" strokeWidth={2} />
+            </div>
+            <span className="font-bold font-bricolage text-lg text-slate-100">FAQ Hive</span>
             </div>
             <ThemeToggle />
           </div>
@@ -308,6 +314,16 @@ export default function ContributeFAQ() {
                         placeholder="Provide a clear, helpful answer..."
                         rows={4}
                         className="w-full bg-white/[0.02] border border-white/5 rounded-xl px-4 py-3.5 text-slate-100 placeholder-slate-600 focus:outline-none focus:border-purple-500/30 focus:ring-1 focus:ring-purple-500/30 transition-all text-sm resize-none"
+                      />
+                    </div>
+
+                    {/* Supporting Documents */}
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 tracking-wider mb-2 uppercase font-bricolage">Supporting Documents</label>
+                      <p className="text-[11px] text-slate-600 font-bricolage mb-2">Attach official notices, guidelines, offer letters, or sample forms (optional).</p>
+                      <AttachmentUpload
+                        attachments={contribAttachments}
+                        onChange={setContribAttachments}
                       />
                     </div>
 

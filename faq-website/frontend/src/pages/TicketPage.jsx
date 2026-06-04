@@ -31,7 +31,7 @@ TicketPage() {
       const res = await axiosClient.get("/tickets/approved");
       setTickets(res.data);
     } catch (err) {
-      console.log(err);
+      
     }
   }
 
@@ -44,7 +44,7 @@ TicketPage() {
       const res = await axiosClient.get(`/submissions/${ticketId}`);
       setSubmissions(res.data);
     } catch (err) {
-      console.log(err);
+      
     }
   }
 
@@ -67,7 +67,7 @@ TicketPage() {
 
     } catch (err) {
 
-      console.log(err);
+      
     }
   }
 
@@ -194,7 +194,7 @@ Write your best answer..."
             Community Answers
           </h2>
 
-          {submissions.map(
+          {(submissions || []).map(
             (submission) => (
 
               <div
@@ -245,7 +245,7 @@ Write your best answer..."
 
       <div className="discussion-grid">
 
-        {tickets.map(
+        {(tickets || []).map(
           (ticket) => (
 
             <div

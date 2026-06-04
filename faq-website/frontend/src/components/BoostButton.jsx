@@ -65,8 +65,21 @@ export default function BoostButton({
     );
   }
 
-  // ── No boost active ─────────────────────────────────────────────────────────
-  if (!canBoost) return null;
+  // ── No boost active — not eligible: render disabled button so feature is discoverable
+  if (!canBoost) {
+    const label = size === 'sm'
+      ? <><span className="hidden sm:inline">🚀 Boost</span><span className="sm:hidden">🚀</span> <span className="opacity-60">1🍕</span></>
+      : '🚀 Boost (1 Pizza Slice)';
+    return (
+      <button
+        disabled
+        className="inline-flex items-center gap-1 text-[10px] font-bold font-bricolage px-2.5 py-1 rounded-full bg-slate-500/10 border border-slate-500/20 text-slate-500 cursor-not-allowed opacity-60 relative"
+        title="You need 1 Pizza Slice to boost this discussion"
+      >
+        {label}
+      </button>
+    );
+  }
 
   const label = size === 'sm'
     ? <><span className="hidden sm:inline">🚀 Boost</span><span className="sm:hidden">🚀</span> <span className="opacity-60">1🍕</span></>

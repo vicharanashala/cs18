@@ -19,7 +19,7 @@ export default function EscalationWidget({ data }) {
       </div>
 
       <div className="space-y-4 relative z-10">
-        {data.map((item, idx) => (
+        {(data || []).map((item, idx) => (
           <div key={idx} className="flex items-center justify-between group">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-xl bg-black/20 border border-white/5 flex items-center justify-center text-xs font-bold text-slate-400">
@@ -41,7 +41,7 @@ export default function EscalationWidget({ data }) {
             </div>
           </div>
         ))}
-        {data.length === 0 && (
+        {(!data || data.length === 0) && (
           <div className="text-slate-500 text-sm font-medium w-full text-center py-4">No critical escalations.</div>
         )}
       </div>

@@ -3,6 +3,7 @@ const SemanticCluster = require('../models/SemanticCluster');
 const Answer = require('../models/Answer');
 const User = require('../models/User');
 const { recordTransaction } = require('./walletHelper');
+const expertiseService = require('../services/expertise.service');
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
@@ -16,7 +17,7 @@ async function generateConsensus(clusterId) {
     // Prepare prompt
     const answerContext = answers.map((a, i) => `Answer ${i + 1} (Author Reputation: ${a.userReputationAtTimeOfPost}): ${a.text}`).join('\n\n');
 
-    const prompt = `You are an expert community moderator. We have a discussion thread with multiple answers.
+    const prompt = `You are an expert community admin or mentor. We have a discussion thread with multiple answers.
 Your goal is to synthesize the best, most accurate consolidated answer based strictly on the provided answers.
 Pay closer attention to answers from authors with higher reputation scores.
 Avoid hallucinations. Highlight the strongest consensus.
@@ -79,6 +80,9 @@ ${answers.map((a, i) => `Answer ${i + 1}: ${a.text}`).join('\n\n')}`;
             question: cluster.canonicalQuestion
           }
         });
+        
+        // Phase 6A: Track accepted answer
+        await expertiseService.recordAcceptedAnswer(winnerAnswer.userId._id, cluster.category);
       }
     }
 

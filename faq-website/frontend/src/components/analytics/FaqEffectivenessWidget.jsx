@@ -17,7 +17,7 @@ export default function FaqEffectivenessWidget({ data }) {
       </div>
 
       <div className="space-y-4">
-        {data.map((faq, idx) => {
+        {(data || []).map((faq, idx) => {
           const isWarning = faq.helpfulRatio < 0.5 && faq.totalFeedback > 2;
           
           return (
@@ -56,7 +56,7 @@ export default function FaqEffectivenessWidget({ data }) {
             </div>
           );
         })}
-        {data.length === 0 && (
+        {(!data || data.length === 0) && (
           <div className="text-slate-500 text-sm font-medium w-full text-center py-4">Not enough feedback data yet.</div>
         )}
       </div>

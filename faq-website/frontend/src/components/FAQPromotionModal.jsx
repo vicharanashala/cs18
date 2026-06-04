@@ -13,7 +13,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, CheckCircle, AlertCircle, Eye, Edit3 } from 'lucide-react';
 import axiosClient from '../api/axiosClient';
 import toast from 'react-hot-toast';
-import { FAQ_CATEGORIES } from '../utils/constants';
 import CategoryDropdown from './CategoryDropdown';
 
 const SOURCE_LABELS = {
@@ -40,34 +39,34 @@ export default function FAQPromotionModal({ isOpen, onClose, source, sourceItem,
     // Fetch dynamic categories
     axiosClient.get('/faqs/categories')
       .then(r => {
-        const names = r.data.categories?.map(c => c.name) || [];
-        setCategories(names.length ? names : FAQ_CATEGORIES);
+        const names = r.data.categories?.map(c => c.name) || ['General', 'Other'];
+        setCategories(names);
+        
+        let initialCat = 'General';
+        if (source === 'oaq') {
+          setQuestion(sourceItem.canonicalQuestion || sourceItem.originalQuestion || '');
+          setAnswer(sourceItem.aiGeneratedAnswer || '');
+          initialCat = names.find(c => c.toLowerCase() === (sourceItem.category || '').toLowerCase()) || 'General';
+          setTags((sourceItem.generatedTags || []).join(', '));
+        } else if (source === 'golden-ticket') {
+          setQuestion(sourceItem.title || '');
+          setAnswer(sourceItem.context || '');
+          initialCat = 'General';
+          setTags('');
+        } else if (source === 'contribution') {
+          setQuestion(sourceItem.generatedQuestion || sourceItem.originalQuestion || '');
+          setAnswer(sourceItem.generatedAnswer || sourceItem.originalAnswer || '');
+          initialCat = names.find(c => c.toLowerCase() === (sourceItem.category || '').toLowerCase()) || 'General';
+          setTags((sourceItem.hashtags || []).join(', '));
+        }
+        setCategory(initialCat);
+        setMode('edit');
       })
-      .catch(() => setCategories(FAQ_CATEGORIES));
-
-    if (source === 'oaq') {
-      setQuestion(sourceItem.canonicalQuestion || sourceItem.originalQuestion || '');
-      setAnswer(sourceItem.aiGeneratedAnswer || '');
-      setCategory(
-        FAQ_CATEGORIES.find(c => c.toLowerCase() === (sourceItem.category || '').toLowerCase()) || 'General'
-      );
-      setTags((sourceItem.generatedTags || []).join(', '));
-    } else if (source === 'golden-ticket') {
-      setQuestion(sourceItem.title || '');
-      setAnswer(sourceItem.context || '');
-      setCategory('General');
-      setTags('');
-    } else if (source === 'contribution') {
-      // Prefer AI-generalized output, fall back to raw
-      setQuestion(sourceItem.generatedQuestion || sourceItem.originalQuestion || '');
-      setAnswer(sourceItem.generatedAnswer || sourceItem.originalAnswer || '');
-      setCategory(
-        FAQ_CATEGORIES.find(c => c.toLowerCase() === (sourceItem.category || '').toLowerCase()) || 'General'
-      );
-      setTags((sourceItem.hashtags || []).join(', '));
-    }
-
-    setMode('edit');
+      .catch(() => {
+        setCategories(['General', 'Other']);
+        setCategory('General');
+        setMode('edit');
+      });
   }, [isOpen, sourceItem, source]);
 
   if (!isOpen) return null;

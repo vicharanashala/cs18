@@ -1,5 +1,5 @@
 const FAQ = require('../models/FAQ');
-const { FAQ_CATEGORIES } = require('../utils/constants');
+
 const getEmbedding = require('../utils/embedding');
 const GoldenTicket = require('../models/GoldenTicket');
 const ContributedFAQ = require('../models/ContributedFAQ');
@@ -78,8 +78,10 @@ exports.createFaq = async (req, res) => {
     if (!question?.trim())  return res.status(400).json({ success: false, error: 'Question is required' });
     if (!answer?.trim())    return res.status(400).json({ success: false, error: 'Answer is required' });
     if (!category)          return res.status(400).json({ success: false, error: 'Category is required' });
-    if (!FAQ_CATEGORIES.includes(category.trim())) {
-      return res.status(400).json({ success: false, error: `Invalid category. Allowed: ${FAQ_CATEGORIES.join(', ')}` });
+    const Category = require('../models/Category');
+    const cat = await Category.findOne({ name: category.trim() });
+    if (!cat && category.trim() !== 'Other') {
+      return res.status(400).json({ success: false, error: 'Invalid category' });
     }
 
     const embedding = await getEmbedding(question.trim());
@@ -129,8 +131,10 @@ exports.updateFaq = async (req, res) => {
     }
 
     if (category !== undefined) {
-      if (!FAQ_CATEGORIES.includes(category.trim())) {
-        return res.status(400).json({ success: false, error: `Invalid category. Allowed: ${FAQ_CATEGORIES.join(', ')}` });
+      const Category = require('../models/Category');
+      const cat = await Category.findOne({ name: category.trim() });
+      if (!cat && category.trim() !== 'Other') {
+        return res.status(400).json({ success: false, error: 'Invalid category' });
       }
       faq.category = category.trim();
     }
@@ -287,8 +291,10 @@ exports.promoteKnowledge = async (req, res) => {
     if (!question?.trim())  return res.status(400).json({ success: false, error: 'Question is required' });
     if (!answer?.trim())    return res.status(400).json({ success: false, error: 'Answer is required' });
     if (!category)          return res.status(400).json({ success: false, error: 'Category is required' });
-    if (!FAQ_CATEGORIES.includes(category.trim())) {
-      return res.status(400).json({ success: false, error: `Invalid category` });
+    const Category = require('../models/Category');
+    const cat = await Category.findOne({ name: category.trim() });
+    if (!cat && category.trim() !== 'Other') {
+      return res.status(400).json({ success: false, error: 'Invalid category' });
     }
 
     // 1. Create the FAQ

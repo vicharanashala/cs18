@@ -13,7 +13,14 @@ const ticketSchema = new mongoose.Schema({
   },
   escalated: { type: Boolean, default: false },
   assignedTo: { type: String, default: null }, // Could be admin name or ID
+  assignedMentor: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   resolvedAt: { type: Date, default: null },
+  severity: { type: Number, default: 0, min: 0, max: 100 },
+  autoRouted: { type: Boolean, default: false },
+  routedAt: { type: Date, default: null },
+  assignedAt: { type: Date, default: null },
+  acceptedAt: { type: Date, default: null },
+  routingReason: { type: String, default: '' },
   referenceId: { type: mongoose.Schema.Types.ObjectId, required: true }, // maps to Submission or PersonalTicket
   
   // Legacy fields (kept for backward compatibility if needed)

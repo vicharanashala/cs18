@@ -4,13 +4,25 @@ const FAQ = require('../models/FAQ');
 const PersonalTicket = require('../models/PersonalTicket');
 const SolvedPersonalIssue = require('../models/SolvedPersonalIssue');
 const Submission = require('../models/Submission');
+const User = require('../models/User');
+const AuditLog = require('../models/AuditLog');
+const SystemSettings = require('../models/SystemSettings');
+const ContributedFAQ = require('../models/ContributedFAQ');
+const SearchAnalytics = require('../models/SearchAnalytics');
+const Cluster = require('../models/Cluster');
+const Attachment = require('../models/Attachment');
+const fs = require('fs');
+const path = require('path');
 const getEmbedding = require('../utils/embedding');
 const { extractPersonalIntent } = require('../utils/intentExtractor');
-const { FAQ_CATEGORIES } = require('../utils/constants');
+
 
 exports.getReviewQueue = async (req, res) => {
   try {
-    const clusters = await SemanticCluster.find({ status: 'ADMIN_REVIEW' }).lean();
+    const clusters = await SemanticCluster.find({ status: 'ADMIN_REVIEW' })
+      .sort({ severityScore: -1, createdAt: -1 })
+      .populate('attachments.uploadedBy', 'username email')
+      .lean();
     res.json({ success: true, clusters });
   } catch (err) {
     console.error('getReviewQueue error:', err);
@@ -20,15 +32,73 @@ exports.getReviewQueue = async (req, res) => {
 
 exports.getCategories = async (req, res) => {
   try {
-    res.json({ categories: FAQ_CATEGORIES.map(name => ({ name })) });
+    const Category = require('../models/Category');
+    const categories = await Category.find().sort({name: 1}).lean();
+    res.json({ success: true, categories });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 };
 
 exports.createCategory = async (req, res) => {
-  // Deprecated as categories are now static constants
-  res.status(400).json({ error: 'Category creation is disabled. Categories are immutable constants.' });
+  try {
+    const Category = require('../models/Category');
+    const category = new Category({ name: req.body.name });
+    await category.save();
+    res.json({ success: true, category });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+};
+
+exports.updateCategory = async (req, res) => {
+  try {
+    const Category = require('../models/Category');
+    const category = await Category.findByIdAndUpdate(req.params.id, { name: req.body.name }, { new: true });
+    res.json({ success: true, category });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+};
+
+exports.deleteCategory = async (req, res) => {
+  try {
+    const Category = require('../models/Category');
+    const FAQ = require('../models/FAQ');
+    const category = await Category.findById(req.params.id);
+    if (!category) return res.status(404).json({ success: false, error: 'Category not found' });
+    
+    const count = await FAQ.countDocuments({ category: category.name });
+    if (count > 0) return res.status(400).json({ success: false, error: `Cannot delete: ${count} FAQs are using this category.` });
+
+    await Category.findByIdAndDelete(req.params.id);
+    res.json({ success: true, message: 'Category deleted' });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+};
+
+exports.getCategoryStats = async (req, res, next) => {
+  try {
+    const Category = require('../models/Category');
+    const FAQ = require('../models/FAQ');
+    const categories = await Category.find().sort({ name: 1 }).lean();
+    const stats = await FAQ.aggregate([
+      { $group: { _id: "$category", count: { $sum: 1 }, views: { $sum: "$viewCount" } } }
+    ]);
+    const statsMap = stats.reduce((acc, curr) => ({ ...acc, [curr._id]: curr }), {});
+    
+    const result = categories.map(cat => ({
+      _id: cat._id,
+      name: cat.name,
+      count: statsMap[cat.name]?.count || 0,
+      views: statsMap[cat.name]?.views || 0,
+      createdAt: cat.createdAt
+    }));
+    res.json({ success: true, categories: result });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
 };
 
 exports.promoteToFaq = async (req, res) => {
@@ -47,8 +117,10 @@ exports.promoteToFaq = async (req, res) => {
     if (!cluster) return res.status(404).json({ error: 'Cluster not found' });
 
     let finalCategory = 'Other';
-    if (categoryName && FAQ_CATEGORIES.includes(categoryName.trim())) {
-      finalCategory = categoryName.trim();
+    const Category = require('../models/Category');
+    if (categoryName) {
+      const cat = await Category.findOne({ name: categoryName.trim() });
+      if (cat) finalCategory = cat.name;
     }
 
     const questionText = editedQuestion || cluster.canonicalQuestion;
@@ -70,7 +142,8 @@ exports.promoteToFaq = async (req, res) => {
       question: questionText,
       answer: answerText,
       embedding,
-      tags: tags || cluster.tags || []
+      tags: tags || cluster.tags || [],
+      attachments: cluster.attachments || []
     });
     await faq.save();
 
@@ -112,9 +185,27 @@ exports.rejectCluster = async (req, res) => {
 // GET PENDING PERSONAL TICKETS
 exports.getPersonalTickets = async (req, res) => {
   try {
-    const tickets = await PersonalTicket.find({ status: 'pending' })
+    let tickets = await PersonalTicket.find({ status: 'pending' })
+      .sort({ severityScore: -1, createdAt: -1 })
       .populate('userId', 'email institution')
       .lean();
+
+    // Attach generic Ticket tracking info (assignedMentor, autoRouted, routingReason, acceptedAt)
+    const Ticket = require('../models/Ticket');
+    const referenceIds = tickets.map(t => t._id);
+    const trackers = await Ticket.find({ referenceId: { $in: referenceIds }, type: 'personal' })
+      .populate('assignedMentor', 'fullName username email')
+      .lean();
+    const trackerMap = trackers.reduce((map, tracker) => {
+      map[tracker.referenceId.toString()] = tracker;
+      return map;
+    }, {});
+
+    tickets = tickets.map(t => ({
+      ...t,
+      trackerInfo: trackerMap[t._id.toString()] || null
+    }));
+
     res.json({ success: true, tickets });
   } catch (err) {
     console.error('getPersonalTickets error:', err);
@@ -578,6 +669,579 @@ exports.splitCluster = async (req, res) => {
     await cluster.save();
 
     res.json({ success: true, message: `Cluster ${clusterId} restored to OPEN status.` });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+/**
+ * GET /api/admin/users
+ * List all users with pizza slices info (admin only)
+ */
+exports.getUsers = async (req, res) => {
+  try {
+    const users = await User.find().select('-password').sort({ createdAt: -1 }).lean();
+    res.json({ success: true, users });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+/**
+ * PATCH /api/admin/users/:userId/pizza
+ * Adjust a user's pizza slices (+/- amount)
+ * Body: { amount: Number, action: 'grant' | 'remove' | 'reset' }
+ */
+exports.adjustUserPizza = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { amount = 0, action } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ error: 'Invalid user ID' });
+    }
+    if (!['grant', 'remove', 'reset', 'setAbsolute'].includes(action)) {
+      return res.status(400).json({ error: 'action must be grant, remove, reset, or setAbsolute' });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const previousSlices = user.pizzaSlices;
+    let newSlices;
+    switch (action) {
+      case 'grant':
+        newSlices = user.pizzaSlices + Math.abs(amount);
+        break;
+      case 'remove':
+        newSlices = Math.max(0, user.pizzaSlices - Math.abs(amount));
+        break;
+      case 'reset':
+        // Reset to the system default (from settings or schema default of 0)
+        const settings = await require('./systemSettingsController').getSettingsCached();
+        newSlices = settings?.defaultPizzaSlices ?? 0;
+        break;
+      case 'setAbsolute':
+        newSlices = Math.max(0, Math.abs(req.body.absoluteValue ?? amount));
+        break;
+    }
+
+    user.pizzaSlices = newSlices;
+    user.reputation = Math.floor(user.pizzaSlices / 6) * 10;
+    await user.save();
+
+    await require('../models/AuditLog').create({
+      adminId: req.user.id,
+      adminType: 'Admin',
+      adminEmail: req.user.email,
+      action: action === 'grant' ? 'PIZZA_GRANTED' : action === 'remove' ? 'PIZZA_REVOKED' : action === 'setAbsolute' ? 'PIZZA_SET' : 'PIZZA_RESET',
+      targetType: 'User',
+      targetId: user._id,
+      targetLabel: user.email,
+      reason: req.body.reason || null,
+      metadata: { previousValue: previousSlices, newValue: newSlices, amount: action === 'setAbsolute' ? undefined : amount },
+    });
+
+    res.json({ success: true, pizzaSlices: user.pizzaSlices, reputation: user.reputation });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+/**
+ * GET /api/admin/users/:userId
+ * Get single user details (admin only)
+ */
+exports.getUserById = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.userId).select('-__v').lean();
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    res.json({ success: true, user });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+/**
+ * POST /api/admin/users/:userId/pizza
+ * Alias — also accept POST for simpler quick-action UI
+ */
+exports.quickGrantPizza = async (req, res) => {
+  req.body.action = 'grant';
+  return exports.adjustUserPizza(req, res);
+};
+
+/**
+ * PATCH /api/admin/users/:userId/spurti
+ * Adjust a user's spurti points (+/- amount)
+ * Body: { amount: Number, action: 'grant' | 'remove' }
+ */
+exports.adjustUserSpurti = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { amount = 0, action } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ error: 'Invalid user ID' });
+    }
+    if (!['grant', 'remove', 'setAbsolute'].includes(action)) {
+      return res.status(400).json({ error: 'action must be grant, remove, or setAbsolute' });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const previousPoints = user.spurtiPoints;
+    let newPoints;
+    if (action === 'grant') {
+      newPoints = user.spurtiPoints + Math.abs(amount);
+    } else if (action === 'remove') {
+      newPoints = Math.max(0, user.spurtiPoints - Math.abs(amount));
+    } else {
+      // setAbsolute: body.absoluteValue is the target value
+      newPoints = Math.max(0, Math.abs(req.body.absoluteValue ?? amount));
+    }
+
+    user.spurtiPoints = newPoints;
+    await user.save();
+
+    // Log to audit
+    await require('../models/AuditLog').create({
+      adminId: req.user.id,
+      adminType: 'Admin',
+      adminEmail: req.user.email,
+      action: action === 'grant' ? 'SPURTI_GRANTED' : action === 'remove' ? 'SPURTI_REVOKED' : 'SPURTI_SET',
+      targetType: 'User',
+      targetId: user._id,
+      targetLabel: user.email,
+      reason: req.body.reason || null,
+      metadata: { previousValue: previousPoints, newValue: newPoints, amount: action === 'setAbsolute' ? undefined : amount, setAbsoluteValue: action === 'setAbsolute' ? newPoints : undefined },
+    });
+
+    res.json({ success: true, spurtiPoints: user.spurtiPoints });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+/**
+ * POST /api/admin/users/:userId/ban
+ * Toggle user ban state (ban or unban)
+ * Body: { banned: true | false, reason?: string }
+ */
+exports.toggleBan = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { banned, reason } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ error: 'Invalid user ID' });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const previousBannedUntil = user.bannedUntil;
+
+    if (banned) {
+      // Ban: set bannedUntil to a far-future date
+      user.bannedUntil = new Date('2099-12-31');
+    } else {
+      // Unban: clear bannedUntil
+      user.bannedUntil = null;
+    }
+    await user.save();
+
+    await require('../models/AuditLog').create({
+      adminId: req.user.id,
+      adminType: 'Admin',
+      adminEmail: req.user.email,
+      action: banned ? 'USER_BANNED' : 'USER_UNBANNED',
+      targetType: 'User',
+      targetId: user._id,
+      targetLabel: user.email,
+      reason: reason || (banned ? 'Policy violation' : 'Reinstated'),
+      metadata: { previousBannedUntil, newBannedUntil: user.bannedUntil },
+    });
+
+    res.json({ success: true, bannedUntil: user.bannedUntil });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+/**
+ * POST /api/admin/users/:userId/suspend
+ * Temporarily suspend contributions (set bannedUntil to short window)
+ * Body: { days: Number, reason?: string }
+ */
+exports.suspendUser = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { days = 7, reason } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ error: 'Invalid user ID' });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const previousBannedUntil = user.bannedUntil;
+    const until = new Date();
+    until.setDate(until.getDate() + Math.max(1, Math.min(days, 365)));
+    user.bannedUntil = until;
+    await user.save();
+
+    await require('../models/AuditLog').create({
+      adminId: req.user.id,
+      adminType: 'Admin',
+      adminEmail: req.user.email,
+      action: 'USER_SUSPENDED',
+      targetType: 'User',
+      targetId: user._id,
+      targetLabel: user.email,
+      reason: reason || 'Contribution suspension',
+      metadata: { previousBannedUntil, newBannedUntil: user.bannedUntil, days },
+    });
+
+    res.json({ success: true, bannedUntil: user.bannedUntil });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+/**
+ * GET /api/admin/audit-log
+ * Fetch moderation audit log entries
+ * Query: ?limit=50&offset=0&userId=<target user filter>
+ */
+exports.getAuditLog = async (req, res) => {
+  try {
+    const { limit = 50, offset = 0, userId, action } = req.query;
+    const filter = {};
+    if (userId) filter.targetId = userId;
+    if (action) filter.action = action;
+
+    const AuditLog = require('../models/AuditLog');
+    const logs = await AuditLog.find(filter)
+      .sort({ timestamp: -1 })
+      .skip(Number(offset))
+      .limit(Number(limit))
+      .populate('adminId', 'email adminType')
+      .lean();
+
+    const total = await AuditLog.countDocuments(filter);
+    res.json({ success: true, logs, total });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+/**
+ * GET /api/admin/users/:userId/history
+ * Fetch ban history + moderation history for a specific user
+ */
+exports.getUserHistory = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ error: 'Invalid user ID' });
+    }
+
+    const AuditLog = require('../models/AuditLog');
+    const [banEvents, modEvents] = await Promise.all([
+      AuditLog.find({
+        targetId: userId,
+        action: { $in: ['USER_BANNED', 'USER_UNBANNED', 'USER_SUSPENDED'] },
+      }).sort({ timestamp: -1 }).limit(50).lean(),
+      AuditLog.find({
+        targetId: userId,
+        action: { $in: [
+          'SPURTI_GRANTED', 'SPURTI_REVOKED', 'SPURTI_SET',
+          'PIZZA_GRANTED', 'PIZZA_REVOKED', 'PIZZA_SET',
+          'REPUTATION_ADJUSTED',
+        ] },
+      }).sort({ timestamp: -1 }).limit(50).lean(),
+    ]);
+
+    res.json({ success: true, banEvents, modEvents });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+/**
+ * GET /api/admin/me
+ * Get the currently authenticated admin's profile and role
+ */
+exports.getCurrentAdmin = async (req, res) => {
+  try {
+    const User = require('../models/User');
+    // Admins are stored in the User collection with elevated roles
+    let admin = await User.findById(req.user.id).select('-password').lean();
+    if (!admin) return res.status(404).json({ error: 'Admin not found' });
+    res.json({ success: true, admin: { id: admin._id, email: admin.email, role: admin.role, createdAt: admin.createdAt } });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+/**
+ * GET /api/admin/user-management/stats
+ * Combined stats for all 6 stat cards on the User Management overview.
+ * Returns: { totalUsers, activeLast30d, smeCount, contributorCount, pendingSmeReviews, suspendedCount }
+ */
+exports.getUserManagementStats = async (req, res) => {
+  try {
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now - 30 * 24 * 60 * 60 * 1000);
+
+    const [
+      totalUsers,
+      activeLast30d,
+      smeCount,
+      contributorCount,
+      pendingSmeReviews,
+      suspendedCount,
+    ] = await Promise.all([
+      User.countDocuments(),
+      User.countDocuments({ lastActive: { $gte: thirtyDaysAgo } }),
+      User.countDocuments({ role: 'mentor' }),
+      ContributedFAQ.distinct('contributedBy'),
+      require('../services/recommendation.service').getSMERecommendations().then(recs => recs.length),
+      User.countDocuments({ $or: [{ isBanned: true }, { bannedUntil: { $gt: now } }] }),
+    ]);
+
+    res.json({
+      totalUsers,
+      activeLast30d,
+      smeCount,
+      contributorCount,
+      pendingSmeReviews,
+      suspendedCount,
+    });
+  } catch (err) {
+    console.error('[getUserManagementStats]', err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+/**
+ * GET /api/admin/users/:userId/stats
+ * Per-user activity stats: questions asked, contributions, FAQs approved
+ */
+exports.getUserStats = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ error: 'Invalid user ID' });
+    }
+
+    const [questionCount, contribCount] = await Promise.all([
+      require('../models/Submission').countDocuments({ userId }),
+      require('../models/ContributedFAQ').countDocuments({ contributedBy: userId }),
+    ]);
+
+    const faqCount = await require('../models/FAQ').countDocuments({
+      authorId: userId,
+      status: 'published',
+    });
+
+    res.json({ success: true, stats: { questionCount, contribCount, faqCount } });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+async function getMediaAnalytics() {
+  try {
+    const total = await Attachment.countDocuments();
+    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+    const todayCount = await Attachment.countDocuments({ uploadedAt: { $gte: todayStart } });
+    const totalBytes = await Attachment.aggregate([{ $group: { _id: null, total: { $sum: '$fileSize' } } }]);
+    const byType = await Attachment.aggregate([
+      { $group: { _id: '$fileType', count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+      { $limit: 6 },
+    ]);
+    return {
+      total, todayCount, totalBytes: totalBytes[0]?.total || 0, byType,
+    };
+  } catch { return { total: 0, todayCount: 0, totalBytes: 0, byType: [] }; }
+}
+
+/**
+ * GET /api/admin/analytics/dashboard
+ * Aggregated analytics for all 5 categories + system health
+ */
+exports.getAdminAnalytics = async (req, res) => {
+  try {
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const weekStart = new Date(todayStart); weekStart.setDate(weekStart.getDate() - 7);
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const hourAgo = new Date(now - 60 * 60 * 1000);
+
+    const [
+      totalUsers, activeToday, newThisWeek, totalFaqs, pendingContributions,
+      allFaqs, allUsers, allClusters, allSubmissions,
+      recentAudit, pendingQueue, answeredToday
+    ] = await Promise.all([
+      User.countDocuments(),
+      User.countDocuments({ lastActive: { $gte: hourAgo } }),
+      User.countDocuments({ createdAt: { $gte: weekStart } }),
+      FAQ.countDocuments({ status: 'published' }),
+      ContributedFAQ.countDocuments({ status: 'pending' }),
+      FAQ.find({}, 'viewCount category createdAt').sort({ viewCount: -1 }).limit(20).lean(),
+      User.find({}, 'spurtiPoints pizzaSlices createdAt lastActive role questionCount').sort({ spurtiPoints: -1 }).limit(20).lean(),
+      SemanticCluster.find({}, 'canonicalQuestion createdAt status').sort({ createdAt: -1 }).limit(20).lean(),
+      Submission.find({}, 'createdAt status').sort({ createdAt: -1 }).lean(),
+      AuditLog.find().sort({ timestamp: -1 }).limit(100).lean(),
+      SemanticCluster.countDocuments({ status: 'ADMIN_REVIEW' }),
+      AuditLog.countDocuments({ action: 'USER_BANNED', timestamp: { $gte: todayStart } }),
+    ]);
+
+    // ── Peak Usage Hours ──────────────────────────────────────────────────────
+    // Build a 24-hour histogram from submissions + clusters + logins
+    const hourBuckets = Array.from({ length: 24 }, (_, i) => ({
+      hour: i, label: `${i.toString().padStart(2,'0')}:00`,
+      questions: 0, discussions: 0, logins: 0, total: 0
+    }));
+    const recentActivity = [
+      ...allSubmissions.filter(s => s.createdAt && s.createdAt >= weekStart),
+      ...allClusters.filter(c => c.createdAt && c.createdAt >= weekStart),
+    ];
+    for (const item of recentActivity) {
+      const h = new Date(item.createdAt).getHours();
+      const bucket = hourBuckets[h];
+      if ('canonicalQuestion' in item) bucket.discussions++;
+      else bucket.questions++;
+      bucket.total++;
+    }
+    // Estimate peak from hour buckets
+    const peakHour = hourBuckets.reduce((max, h) => h.total > max.total ? h : max, hourBuckets[0]);
+    const avgHourly = Math.round(hourBuckets.reduce((s, h) => s + h.total, 0) / 24) || 1;
+
+    // ── Most Active Users (by SP) ─────────────────────────────────────────────
+    const mostActiveUsers = allUsers.slice(0, 5).map(u => ({
+      id: u._id, email: u.email, sp: u.spurtiPoints || 0,
+      pizza: u.pizzaSlices || 0, questions: u.questionCount || 0,
+      isAdmin: u.role === 'admin',
+    }));
+
+    // ── Most Viewed FAQ ───────────────────────────────────────────────────────
+    const mostViewedFaq = allFaqs[0] || null;
+
+    // ── Most Asked Category ───────────────────────────────────────────────────
+    const catCounts = {};
+    for (const f of allFaqs) { if (f.category) { catCounts[f.category] = (catCounts[f.category] || 0) + 1; } }
+    const sortedCats = Object.entries(catCounts).sort((a, b) => b[1] - a[1]);
+    const mostAskedCategory = sortedCats[0] || ['General', 0];
+
+    // ── Most Questions Asked (users by questionCount) ─────────────────────────
+    const topQuestionAskers = [...allUsers].sort((a, b) => (b.questionCount || 0) - (a.questionCount || 0)).slice(0, 5).map(u => ({
+      id: u._id, email: u.email, count: u.questionCount || 0,
+    }));
+
+    // ── Most FAQs Approved (by published FAQ count) ───────────────────────────
+    const topFaqAuthors = {};
+    for (const f of allFaqs) { if (f.authorId) { topFaqAuthors[f.authorId] = (topFaqAuthors[f.authorId] || 0) + 1; } }
+    const topAuthorEntries = Object.entries(topFaqAuthors).sort((a, b) => b[1] - a[1]).slice(0, 5);
+    const topAuthorIds = topAuthorEntries.map(([id]) => id);
+    const authorDocs = await User.find({ _id: { $in: topAuthorIds } }).select('email').lean();
+    const authorMap = Object.fromEntries(authorDocs.map(a => [a._id.toString(), a.email]));
+    const mostFaqApproved = topAuthorEntries.map(([id, count]) => ({
+      id, email: authorMap[id] || id, count,
+    }));
+
+    // ── Top Contributors (by audit log activity) ─────────────────────────────
+    const adminActionCounts = {};
+    for (const entry of recentAudit) {
+      if (entry.adminId) {
+        const key = entry.adminId.toString();
+        adminActionCounts[key] = (adminActionCounts[key] || 0) + 1;
+      }
+    }
+    const topContributorsEntries = Object.entries(adminActionCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+    const topContributorIds = topContributorsEntries.map(([id]) => id);
+    const contributorDocs = await User.find({ _id: { $in: topContributorIds } }).select('email').lean();
+    const contributorMap = Object.fromEntries(contributorDocs.map(a => [a._id.toString(), a.email]));
+    const topContributors = topContributorsEntries.map(([id, count]) => ({
+      id, email: contributorMap[id] || id, actions: count,
+    }));
+
+    // ── Most Searched Keywords ────────────────────────────────────────────────
+    const keywordDocs = await SearchAnalytics.find({}).sort({ count: -1 }).limit(10).lean();
+    const mostSearched = keywordDocs.map(k => ({ keyword: k.query || k.keyword, count: k.count || 0 }));
+
+    // ── Duplicate Questions Detected ─────────────────────────────────────────
+    const duplicateClusters = await Cluster.countDocuments({
+      canonicalQuestion: { $exists: true, $ne: '' },
+    });
+
+    // ── Unanswered Questions ─────────────────────────────────────────────────
+    const unanswered = await Cluster.countDocuments({
+      $or: [{ canonicalAnswer: { $exists: false } }, { canonicalAnswer: '' }],
+    });
+
+    // ── User Growth Trend ────────────────────────────────────────────────────
+    const months = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now); d.setDate(1); d.setMonth(d.getMonth() - i);
+      const next = new Date(d); next.setMonth(next.getMonth() + 1);
+      const count = await User.countDocuments({ createdAt: { $gte: d, $lt: next } });
+      const label = d.toLocaleString('default', { month: 'short', year: '2-digit' });
+      months.push({ label, count });
+    }
+
+    // ── Returning Users (users who logged in after their creation day) ───────
+    const returningUsers = await User.countDocuments({
+      lastActive: { $exists: true },
+      $expr: { $gt: [{ $dayOfMonth: '$lastActive' }, { $dayOfMonth: '$createdAt' }] },
+    });
+
+    // ── System Health ────────────────────────────────────────────────────────
+    let apiStatus = 'operational', dbStatus = 'operational', wsStatus = 'unknown', storageStatus = 'operational';
+    try {
+      await User.findOne({}, { _id: 1 }).lean();
+      dbStatus = 'operational';
+    } catch { dbStatus = 'degraded'; }
+    try {
+      const { execSync } = require('child_process');
+      const size = execSync(`du -sm /Users/animeshpathak/ocfaqproj/faq-website/backend/data 2>/dev/null | cut -f1`, { encoding: 'utf8' });
+      const mb = parseInt(size.trim(), 10);
+      storageStatus = mb > 900 ? 'degraded' : 'operational';
+    } catch { storageStatus = 'unknown'; }
+
+    const analytics = {
+      // Section 2: Admin Analytics
+      totalUsers, activeUsersToday: activeToday, questionsToday: recentAudit.length,
+      faqsPublished: totalFaqs, pendingContributions,
+      // Section 3: User Demographics
+      peakUsageHours: hourBuckets,
+      peakHour: { hour: peakHour.hour, label: peakHour.label },
+      mostActiveUsers,
+      newUsersThisWeek: newThisWeek,
+      returningUsers,
+      userGrowthTrend: months,
+      // Section 4: Contributor Analytics
+      mostQuestionsAsked: topQuestionAskers,
+      mostFaqsApproved: mostFaqApproved,
+      topContributors,
+      // Section 5: Knowledge Base Intelligence
+      mostViewedFaq: mostViewedFaq ? { id: mostViewedFaq._id, question: mostViewedFaq.canonicalQuestion || 'Untitled', views: mostViewedFaq.viewCount || 0 } : null,
+      mostAskedCategory: { name: mostAskedCategory[0], count: mostAskedCategory[1] },
+      mostSearchedKeywords: mostSearched,
+      unansweredQuestions: unanswered,
+      duplicateQuestionsDetected: duplicateClusters,
+      // Section 6: System Health
+      systemHealth: { api: apiStatus, database: dbStatus, websocket: wsStatus, storage: storageStatus },
+      // Section 7: Media & Attachments
+      mediaAnalytics: await getMediaAnalytics(),
+    };
+
+    res.json({ success: true, analytics });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

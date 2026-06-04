@@ -4,9 +4,9 @@ const Submission = require('../models/Submission');
 const PersonalTicket = require('../models/PersonalTicket');
 const SemanticCluster = require('../models/SemanticCluster');
 
-exports.createTicket = async (userId, question, type, referenceId, category = "General") => {
+exports.createTicket = async (userId, question, type, referenceId, category = "General", severity = 0) => {
   const ticketNumber = await generateTicketNumber();
-  
+
   const ticket = new Ticket({
     ticketNumber,
     userId,
@@ -14,11 +14,20 @@ exports.createTicket = async (userId, question, type, referenceId, category = "G
     category,
     type,
     referenceId,
-    status: 'submitted',
-    escalated: false
+    status:    'submitted',
+    escalated: false,
+    severity,
   });
 
   await ticket.save();
+
+  // Auto-route high-severity tickets to SME + admin queue
+  if (severity >= 70) {
+    require('../controllers/userManagementController').autoRouteTicket(ticket).catch(err =>
+      console.error('[AutoRoute error]', err)
+    );
+  }
+
   return ticketNumber;
 };
 

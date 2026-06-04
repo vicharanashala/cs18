@@ -169,7 +169,7 @@ const NOTIF = {
       userId,
       type: 'TICKET_ESCALATED',
       title: 'Your query was escalated',
-      message: `Your query has been escalated to a senior moderator.`,
+      message: `Your query has been escalated to an admin.`,
       metadata: { ticketNumber: ticket.ticketNumber },
       priority: 'high',
       actionUrl: `/tickets/${ticket.ticketNumber}`,
@@ -251,6 +251,29 @@ const NOTIF = {
       metadata: { ticketNumber: ticket.ticketNumber, reason },
       priority: 'high',
       actionUrl: `/golden-tickets`,
+    }),
+
+  // ── Boost events ──────────────────────────────────────────────────────────
+  boostExpired: (userId, ticketId, ticketQuestion) =>
+    create({
+      userId,
+      type:     'BOOST_EXPIRED',
+      title:    '🚀 Boost Expired',
+      message:  `Your boost for "${(ticketQuestion || '').slice(0, 60)}" has ended. Your ticket is back to normal visibility.`,
+      metadata: { ticketId },
+      priority: 'low',
+      actionUrl: '/dashboard',
+    }),
+
+  ticketConvertedToGolden: (userId, goldenTicketId, ticketQuestion) =>
+    create({
+      userId,
+      type:     'TICKET_CONVERTED_TO_GOLDEN',
+      title:    '⭐ Ticket Converted to Golden Ticket!',
+      message:  `Your ticket has been upgraded to a Golden Ticket: "${(ticketQuestion || '').slice(0, 60)}"`,
+      metadata: { goldenTicketId },
+      priority: 'high',
+      actionUrl: '/golden-tickets',
     }),
 
   // ── Contribution events ───────────────────────────────────────────────────

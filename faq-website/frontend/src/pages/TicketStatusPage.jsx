@@ -3,9 +3,9 @@ import { useNavigate, useParams } from 'react-router-dom';
 import axiosClient from '../api/axiosClient';
 import toast from 'react-hot-toast';
 import {
-  MessageSquare, Book, Wallet, LogOut, X,
-  Menu, Sparkles, CheckSquare, Search
-} from 'lucide-react';
+  MessageSquare, Wallet, LogOut, X,
+  Menu, Sparkles, CheckSquare, Search, Zap
+, Book } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import GoldenTicketIcon from '../components/GoldenTicketIcon';
 import BannedUserBanner from '../components/BannedUserBanner';
@@ -13,6 +13,7 @@ import ThemeToggle from '../components/ThemeToggle';
 import StatusTimeline from '../components/StatusTimeline';
 import AppealCard from '../components/AppealCard';
 import { useBannedTheme } from '../hooks/useBannedTheme';
+import StaffToolsNav from '../components/StaffToolsNav';
 
 // Extracted NavItem from existing layout conventions
 const NavItem = ({ icon: Icon, label, active, onClick }) => (
@@ -78,7 +79,7 @@ export default function TicketStatusPage() {
 
   const navSection = (close = () => {}) => (
     <nav className="space-y-1.5">
-      <NavItem icon={Book} label="FAQ" active={false} onClick={() => { navigate('/faq'); close(); }} />
+      <NavItem icon={Book} label="FAQ" active={false} onClick={() => { navigate('/faqs'); close(); }} />
       <NavItem icon={MessageSquare} label="Once Asked Questions" active={false} onClick={() => { navigate('/discussions'); close(); }} />
       <NavItem icon={Wallet} label="Wallet" active={false} onClick={() => { navigate('/wallet'); close(); }} />
       <div className="pt-3 space-y-2 border-t border-white/5 mt-3">
@@ -94,6 +95,7 @@ export default function TicketStatusPage() {
           <span className="drop-shadow-md tracking-wide">Golden Ticket</span>
         </button>
       </div>
+      <StaffToolsNav close={close} />
     </nav>
   );
 
@@ -153,10 +155,10 @@ export default function TicketStatusPage() {
         <div>
           <div className="flex items-center justify-between mb-10 px-2">
             <div className="flex items-center gap-2.5 cursor-pointer" onClick={() => navigate('/dashboard')}>
-              <div className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center shadow-md transition-colors hover:bg-white/10">
-                <Book size={16} className="text-slate-300" strokeWidth={2} />
-              </div>
-              <span className="font-bold font-bricolage text-xl text-slate-100 tracking-tight">FAQ Hive</span>
+              <div className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center">
+              <Book size={16} className="text-slate-300" strokeWidth={2} />
+            </div>
+            <span className="font-bold font-bricolage text-lg text-slate-100">FAQ Hive</span>
             </div>
             <ThemeToggle />
           </div>
@@ -212,6 +214,36 @@ export default function TicketStatusPage() {
                 {/* Context Overview */}
                 <div className="glass-card rounded-3xl p-6 md:p-8 border border-slate-200/50 dark:border-white/5 bg-white/40 dark:bg-black/10 backdrop-blur-xl shadow-sm mt-8">
                   <h3 className="font-bold font-bricolage text-slate-800 dark:text-slate-200 mb-5 text-lg">Ticket Details</h3>
+                  
+                  {ticket.trackerInfo && ticket.trackerInfo.autoRouted && (
+                    <div className="mb-6 p-4 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-slate-700 dark:text-slate-300">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Zap size={16} className="text-blue-500" />
+                        <span className="font-bold font-bricolage text-sm text-blue-500">Auto-Routed</span>
+                      </div>
+                      <div className="grid md:grid-cols-2 gap-4 text-sm mt-3">
+                        <div>
+                          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Routing Reason</p>
+                          <p className="font-medium text-slate-800 dark:text-slate-300">{ticket.trackerInfo.routingReason || 'High Severity Score'}</p>
+                        </div>
+                        {ticket.trackerInfo.assignedMentor && (
+                          <div>
+                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Assigned SME</p>
+                            <p className="font-medium text-slate-800 dark:text-slate-300">{ticket.trackerInfo.assignedMentor.fullName || ticket.trackerInfo.assignedMentor.username}</p>
+                          </div>
+                        )}
+                        <div>
+                           <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Severity Score</p>
+                           <p className="font-medium text-slate-800 dark:text-slate-300">{ticket.severityScore}/100</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Current Status</p>
+                          <p className="font-medium text-slate-800 dark:text-slate-300 capitalize">{ticket.status.replace('_', ' ')}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="space-y-5">
                     <div>
                       <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest font-bricolage mb-1.5">Question</p>

@@ -3,7 +3,8 @@ import { motion } from 'framer-motion';
 
 export default function ActivityHeatmap({ data }) {
   // data format: [{ hour: 0, count: 5, label: '12 AM' }, ...]
-  const maxCount = Math.max(...data.map(d => d.count), 1);
+  const safeData = data || [];
+  const maxCount = Math.max(...safeData.map(d => d.count), 1);
 
   return (
     <div className="glass-card rounded-3xl p-6 md:p-8 border border-emerald-900/30 relative overflow-hidden bg-gradient-to-br from-emerald-950/20 to-transparent">
@@ -19,7 +20,7 @@ export default function ActivityHeatmap({ data }) {
       </div>
 
       <div className="relative h-48 flex items-end gap-1 sm:gap-2 z-10 mt-8">
-        {data.map((d, idx) => {
+        {safeData.map((d, idx) => {
           const heightPercent = (d.count / maxCount) * 100;
           const isPeak = heightPercent > 80;
           return (

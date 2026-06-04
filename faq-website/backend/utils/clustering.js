@@ -1,6 +1,7 @@
 const SemanticCluster = require('../models/SemanticCluster');
 const getEmbedding = require('./embedding');
 const { generateCanonicalTitle } = require('./generateCanonicalTitle');
+const { calculateSeverity } = require('./severityEngine');
 
 const SIMILARITY_THRESHOLD = 0.82; // cosine similarity ≥ this → auto-merge
 
@@ -87,6 +88,12 @@ async function findOrCreateCluster(question, context, userId, threshold = SIMILA
     }],
     history: [{ event: 'Discussion created', timestamp: new Date() }],
   });
+  
+  const severity = calculateSeverity(newCluster);
+  newCluster.severityScore = severity.severityScore;
+  newCluster.priorityLevel = severity.priorityLevel;
+  newCluster.severityBreakdown = severity.severityBreakdown;
+
   await newCluster.save();
   return { cluster: newCluster, isNew: true, joinMethod: 'MANUAL', typedQuestion: question };
 }

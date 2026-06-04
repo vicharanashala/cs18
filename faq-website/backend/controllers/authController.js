@@ -1,5 +1,4 @@
 const User = require('../models/User');
-const Admin = require('../models/Admin');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
@@ -21,9 +20,9 @@ exports.register = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'An account with this email already exists.' });
     }
 
-    const assignedRole = role === 'admin' ? 'admin' : 'student';
+    const assignedRole = ['admin','mentor'].includes(role) ? role : 'user';
 
-    user = new User({ email, password, role: assignedRole });
+    user = new User({ email, password, role: assignedRole, username: email?.split('@')[0], fullName: '' });
     await user.save();
 
     const token = jwt.sign({ id: user._id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
@@ -36,36 +35,45 @@ exports.register = async (req, res, next) => {
 exports.login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
+    console.log(`[LOGIN] Attempting login for email: ${email}`);
     
     if (!email || !password) {
+      console.log(`[LOGIN] Missing email or password`);
       return res.status(400).json({ success: false, message: 'Please provide both email and password.' });
     }
 
     const user = await User.findOne({ email });
+    console.log(`[LOGIN] User lookup result:`, user ? `Found (Role: ${user.role})` : 'Not Found');
+    
     if (!user) {
       return res.status(401).json({ success: false, message: 'Invalid email or password.' });
     }
 
     const isMatch = await user.matchPassword(password);
+    console.log(`[LOGIN] Password match result: ${isMatch}`);
+    
     if (!isMatch) {
       return res.status(401).json({ success: false, message: 'Invalid email or password.' });
     }
 
+    console.log(`[LOGIN] Generating JWT token...`);
     const token = jwt.sign({ id: user._id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
     const isBanned = !!(user.bannedUntil && user.bannedUntil > Date.now());
-    res.json({ success: true, token, user: { id: user._id, email: user.email, role: user.role, reputation: user.reputation, spurtiPoints: user.spurtiPoints, isBanned } });
+    
+    console.log(`[LOGIN] Login successful for: ${email}`);
+    res.json({ success: true, token, user: { id: user._id, email: user.email, role: user.role, reputation: user.reputation, spurtiPoints: user.spurtiPoints, isBanned, username: user.username, fullName: user.fullName } });
   } catch (err) {
+    console.error(`[LOGIN ERROR]:`, err);
     next(err);
   }
 };
 
 exports.me = async (req, res, next) => {
   try {
-    if (req.user.role === 'admin') {
-      const admin = await Admin.findById(req.user.id).select('-password');
-      return res.json({ success: true, user: { ...admin.toObject(), isBanned: false } });
-    }
     const user = await User.findById(req.user.id).select('-password');
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found.' });
+    }
     const isBanned = !!(user.bannedUntil && user.bannedUntil > Date.now());
     res.json({ success: true, user: { ...user.toObject(), isBanned } });
   } catch (err) {

@@ -17,7 +17,7 @@ export default function TopicTrendsWidget({ data }) {
       </div>
 
       <div className="flex flex-wrap gap-3">
-        {data.map((item, idx) => (
+        {(data || []).map((item, idx) => (
           <div 
             key={idx}
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900/50 border border-white/5 hover:border-teal-500/30 hover:bg-teal-500/5 transition-all group"
@@ -29,7 +29,7 @@ export default function TopicTrendsWidget({ data }) {
             </div>
           </div>
         ))}
-        {data.length === 0 && (
+        {(!data || data.length === 0) && (
           <div className="text-slate-500 text-sm font-medium w-full text-center py-4">No trending topics found.</div>
         )}
       </div>

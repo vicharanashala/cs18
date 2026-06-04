@@ -1,6 +1,7 @@
 const GoldenTicket = require('../models/GoldenTicket');
 const User = require('../models/User');
 const { recordTransaction } = require('../utils/walletHelper');
+const { calculateSeverity } = require('../utils/severityEngine');
 
 exports.createTicket = async (req, res) => {
   try {
@@ -33,12 +34,18 @@ exports.createTicket = async (req, res) => {
     await user.save();
 
     // Create Ticket
-    const ticket = await GoldenTicket.create({
+    const ticketData = {
       title,
       context,
       createdBy: user._id,
       spurtiSpent,
-    });
+    };
+    const severity = calculateSeverity(ticketData);
+    ticketData.severityScore = severity.severityScore;
+    ticketData.priorityLevel = severity.priorityLevel;
+    ticketData.severityBreakdown = severity.severityBreakdown;
+
+    const ticket = await GoldenTicket.create(ticketData);
 
     // Record Transaction & Deduct SP
     await recordTransaction({
@@ -110,7 +117,7 @@ exports.getAdminTickets = async (req, res) => {
   try {
     const tickets = await GoldenTicket.find({ status: 'active' })
       .populate('createdBy', 'email reputation')
-      .sort({ spurtiSpent: -1, createdAt: 1 })
+      .sort({ severityScore: -1, spurtiSpent: -1, createdAt: 1 })
       .lean();
     res.json({ success: true, tickets });
   } catch (error) {

@@ -1,429 +1,501 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { createPortal } from 'react-dom';
-import { ChevronDown, Check, Search } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { FAQ_CATEGORIES } from '../utils/constants';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { ChevronDown, Check, Search, X } from 'lucide-react';
+import axiosClient from '../api/axiosClient';
 
-export const FALLBACK_CATEGORIES = FAQ_CATEGORIES;
+export const FALLBACK_CATEGORIES = ['General', 'Admissions', 'Academics', 'Hostel', 'Fees & Finance', 'Other'];
 
-const dropdownStyles = `
-  .premium-dropdown-container {
+const PopoverStyles = `
+  .cat-popover-wrapper {
     position: relative;
     width: 100%;
   }
-  
-  .premium-dropdown-trigger {
+
+  .cat-popover-trigger {
     width: 100%;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 14px 20px;
-    border-radius: 16px;
+    padding: 12px 16px;
+    border-radius: 14px;
     font-size: 14px;
     font-weight: 500;
     transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
     outline: none;
     cursor: pointer;
+    border: 1px solid transparent;
   }
 
-  :root .premium-dropdown-trigger {
+  :root .cat-popover-trigger {
     background: rgba(255, 255, 255, 0.6);
-    border: 1px solid rgba(0, 0, 0, 0.06);
+    border-color: rgba(0, 0, 0, 0.08);
     color: #111827;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
   }
 
-  :root .premium-dropdown-trigger:hover:not(:disabled) {
+  :root .cat-popover-trigger:hover:not(:disabled) {
     background: rgba(255, 255, 255, 0.85);
-    border-color: rgba(0, 0, 0, 0.1);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+    border-color: rgba(0, 0, 0, 0.12);
   }
 
-  :root .premium-dropdown-trigger:focus:not(:disabled) {
-    border-color: rgba(139, 92, 246, 0.4);
-    box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1), 0 4px 12px rgba(0, 0, 0, 0.04);
+  :root .cat-popover-trigger:focus:not(:disabled) {
+    border-color: rgba(139, 92, 246, 0.5);
+    box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.12);
   }
 
-  [data-theme='dark'] .premium-dropdown-trigger {
-    background: rgba(255, 255, 255, 0.02);
-    border: 1px solid rgba(255, 255, 255, 0.05);
+  [data-theme='dark'] .cat-popover-trigger {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.08);
     color: #cbd5e1;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   }
 
-  [data-theme='dark'] .premium-dropdown-trigger:hover:not(:disabled) {
-    background: rgba(255, 255, 255, 0.05);
-    border-color: rgba(255, 255, 255, 0.1);
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  [data-theme='dark'] .cat-popover-trigger:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.07);
+    border-color: rgba(255, 255, 255, 0.14);
   }
 
-  [data-theme='dark'] .premium-dropdown-trigger:focus:not(:disabled) {
-    border-color: rgba(167, 139, 250, 0.4);
-    box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.15), 0 4px 16px rgba(0, 0, 0, 0.2);
+  [data-theme='dark'] .cat-popover-trigger:focus:not(:disabled) {
+    border-color: rgba(167, 139, 250, 0.5);
+    box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.15);
   }
 
-  .premium-dropdown-trigger:disabled {
+  .cat-popover-trigger:disabled {
     opacity: 0.4;
     cursor: not-allowed;
   }
 
-  .premium-dropdown-trigger .placeholder {
-    color: #6b7280;
-  }
-  [data-theme='dark'] .premium-dropdown-trigger .placeholder {
-    color: rgba(255, 255, 255, 0.42);
+  .cat-popover-trigger-placeholder {
+    color: #9ca3af;
   }
 
-  .premium-dropdown-panel {
-    /* Set via inline styles when rendered in Portal */
-    z-index: 9999;
-    border-radius: 24px;
-    overflow: hidden;
-    isolation: isolate;
-    backdrop-filter: blur(24px);
-    -webkit-backdrop-filter: blur(24px);
-    box-shadow:
-      0 40px 120px rgba(0, 0, 0, 0.18),
-      0 12px 40px rgba(0, 0, 0, 0.10),
-      inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  .cat-popover-selected-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
   }
 
-  .premium-dropdown-panel::before {
-    content: "";
+  :root .cat-popover-selected-tag {
+    background: rgba(139, 92, 246, 0.12);
+    color: #7c3aed;
+    border: 1px solid rgba(139, 92, 246, 0.2);
+  }
+
+  [data-theme='dark'] .cat-popover-selected-tag {
+    background: rgba(139, 92, 246, 0.15);
+    color: #c4b5fd;
+    border: 1px solid rgba(139, 92, 246, 0.25);
+  }
+
+  .cat-popover-panel {
     position: absolute;
-    inset: 0;
-    background: linear-gradient(
-      135deg,
-      rgba(255, 255, 255, 0.05),
-      transparent 45%
-    );
-    pointer-events: none;
-    border-radius: inherit;
-    z-index: 10;
+    top: calc(100% + 8px);
+    left: 0;
+    right: 0;
+    z-index: 200;
+    border-radius: 16px;
+    max-height: 280px;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18), 0 2px 8px rgba(0, 0, 0, 0.08);
+    overflow: hidden;
   }
 
-  :root .premium-dropdown-panel {
-    background: rgba(255, 255, 255, 0.78);
-    border: 1px solid rgba(255, 255, 255, 0.65);
+  :root .cat-popover-panel {
+    background: rgba(255, 255, 255, 0.96);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
   }
 
-  [data-theme='dark'] .premium-dropdown-panel {
-    background: rgba(10, 10, 18, 0.82);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    box-shadow: 
-      0 40px 120px rgba(0, 0, 0, 0.55),
-      0 12px 40px rgba(0, 0, 0, 0.32),
-      inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  [data-theme='dark'] .cat-popover-panel {
+    background: rgba(15, 15, 25, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3);
   }
 
-  .premium-dropdown-search-container {
-    padding: 14px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-    position: relative;
-    z-index: 20;
-  }
-  
-  :root .premium-dropdown-search-container {
-    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
-  }
-
-  .premium-dropdown-search-wrapper {
+  .cat-popover-search {
     display: flex;
     align-items: center;
     gap: 10px;
-    border-radius: 14px;
-    padding: 12px 14px;
-    transition: all 0.2s ease;
+    padding: 10px 14px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
   }
 
-  :root .premium-dropdown-search-wrapper {
-    background: rgba(255, 255, 255, 0.72);
-    border: 1px solid rgba(0, 0, 0, 0.12);
+  :root .cat-popover-search {
+    border-color: rgba(0, 0, 0, 0.06);
   }
 
-  :root .premium-dropdown-search-wrapper:focus-within {
-    border-color: rgba(139, 92, 246, 0.4);
-    background: rgba(255, 255, 255, 0.95);
-    box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.14);
+  .cat-popover-search-icon {
+    color: #9ca3af;
+    flex-shrink: 0;
   }
 
-  [data-theme='dark'] .premium-dropdown-search-wrapper {
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.15);
-  }
-
-  [data-theme='dark'] .premium-dropdown-search-wrapper:focus-within {
-    border-color: rgba(167, 139, 250, 0.4);
-    background: rgba(255, 255, 255, 0.08);
-    box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.14);
-  }
-
-  .premium-dropdown-search-input {
+  .cat-popover-search-input {
+    flex: 1;
     background: transparent;
     border: none;
     outline: none;
     font-size: 14px;
-    width: 100%;
+    color: inherit;
   }
 
-  :root .premium-dropdown-search-input {
+  :root .cat-popover-search-input {
     color: #111827;
   }
 
-  :root .premium-dropdown-search-input::placeholder {
+  :root .cat-popover-search-input::placeholder {
+    color: #9ca3af;
+  }
+
+  [data-theme='dark'] .cat-popover-search-input {
+    color: #e2e8f0;
+  }
+
+  [data-theme='dark'] .cat-popover-search-input::placeholder {
+    color: rgba(255, 255, 255, 0.4);
+  }
+
+  .cat-popover-clear {
+    background: none;
+    border: none;
+    padding: 2px;
+    cursor: pointer;
+    color: #9ca3af;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    transition: color 0.15s;
+  }
+
+  .cat-popover-clear:hover {
     color: #6b7280;
   }
 
-  [data-theme='dark'] .premium-dropdown-search-input {
-    color: #ffffff;
+  [data-theme='dark'] .cat-popover-clear {
+    color: rgba(255, 255, 255, 0.4);
   }
 
-  [data-theme='dark'] .premium-dropdown-search-input::placeholder {
-    color: rgba(255, 255, 255, 0.42);
+  [data-theme='dark'] .cat-popover-clear:hover {
+    color: rgba(255, 255, 255, 0.7);
   }
 
-  .premium-dropdown-list {
-    max-height: 320px;
+  .cat-popover-list {
+    max-height: 240px;
     overflow-y: auto;
-    padding: 10px;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    position: relative;
-    z-index: 20;
+    padding: 6px;
   }
 
-  /* Custom premium scrollbar */
-  .premium-dropdown-list::-webkit-scrollbar {
-    width: 6px;
+  .cat-popover-list::-webkit-scrollbar {
+    width: 4px;
   }
-  .premium-dropdown-list::-webkit-scrollbar-track {
+
+  .cat-popover-list::-webkit-scrollbar-track {
     background: transparent;
   }
-  .premium-dropdown-list::-webkit-scrollbar-thumb {
+
+  .cat-popover-list::-webkit-scrollbar-thumb {
     border-radius: 10px;
   }
-  :root .premium-dropdown-list::-webkit-scrollbar-thumb {
-    background: rgba(0, 0, 0, 0.15);
-  }
-  [data-theme='dark'] .premium-dropdown-list::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.18);
+
+  :root .cat-popover-list::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.12);
   }
 
-  .premium-dropdown-item {
+  [data-theme='dark'] .cat-popover-list::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.12);
+  }
+
+  .cat-popover-item {
     width: 100%;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 16px;
-    border-radius: 16px;
+    padding: 10px 14px;
+    border-radius: 10px;
     font-size: 14px;
     font-weight: 500;
     cursor: pointer;
-    border: 1px solid transparent;
-    transition: all 0.2s ease;
+    border: none;
+    background: transparent;
+    transition: background 0.12s ease;
     text-align: left;
+    color: inherit;
     outline: none;
   }
 
-  :root .premium-dropdown-item {
-    color: #4b5563;
+  .cat-popover-item:hover,
+  .cat-popover-item.highlighted {
+    border-radius: 10px;
   }
 
-  :root .premium-dropdown-item:hover {
-    background: rgba(0, 0, 0, 0.04);
+  :root .cat-popover-item:hover,
+  :root .cat-popover-item.highlighted {
+    background: rgba(139, 92, 246, 0.08);
     color: #111827;
   }
 
-  :root .premium-dropdown-item.selected {
-    background: rgba(139, 92, 246, 0.14);
+  [data-theme='dark'] .cat-popover-item:hover,
+  [data-theme='dark'] .cat-popover-item.highlighted {
+    background: rgba(139, 92, 246, 0.12);
+    color: #f1f5f9;
+  }
+
+  .cat-popover-item.selected {
+    font-weight: 700;
+  }
+
+  :root .cat-popover-item.selected {
     color: #7c3aed;
-    font-weight: 600;
   }
 
-  [data-theme='dark'] .premium-dropdown-item {
-    color: rgba(255, 255, 255, 0.72);
+  [data-theme='dark'] .cat-popover-item.selected {
+    color: #c4b5fd;
   }
 
-  [data-theme='dark'] .premium-dropdown-item:hover {
-    background: rgba(255, 255, 255, 0.06);
-    color: #ffffff;
+  .cat-popover-check {
+    color: #a78bfa;
+    flex-shrink: 0;
   }
 
-  [data-theme='dark'] .premium-dropdown-item.selected {
-    background: rgba(139, 92, 246, 0.14);
-    color: #ffffff;
-    font-weight: 600;
-  }
-
-  .premium-dropdown-empty {
-    padding: 16px;
+  .cat-popover-empty {
+    padding: 20px 14px;
     text-align: center;
     font-size: 13px;
+    color: #9ca3af;
     font-style: italic;
   }
 
-  :root .premium-dropdown-empty {
-    color: #6b7280;
+  .cat-popover-hint {
+    padding: 8px 14px 10px;
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.3);
+    text-align: center;
+    letter-spacing: 0.02em;
   }
 
-  [data-theme='dark'] .premium-dropdown-empty {
-    color: rgba(255, 255, 255, 0.42);
-  }
-
-  .dropdown-backdrop {
-    position: fixed;
-    inset: 0;
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    background: rgba(0, 0, 0, 0.08);
-    z-index: 9990;
+  :root .cat-popover-hint {
+    color: rgba(0, 0, 0, 0.35);
   }
 `;
 
-export default function CategoryDropdown({ value, onChange, disabled, categories }) {
+/**
+ * Compact inline category selector — no portal, no extra backdrop.
+ * Keeps the FAQ form fully visible while selecting.
+ */
+export default function CategoryDropdown({ value, onChange, disabled, categories: initialCategories }) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [dropdownStyle, setDropdownStyle] = useState({});
-  const ref = useRef(null);
+  const [highlightedIndex, setHighlightedIndex] = useState(0);
+  const triggerRef = useRef(null);
+  const searchRef = useRef(null);
+  const listRef = useRef(null);
+
+  const [categories, setCategories] = useState(initialCategories || []);
 
   useEffect(() => {
-    const handleClick = (e) => {
-      // Find both the trigger ref and the dropdown panel
-      const isInsideTrigger = ref.current && ref.current.contains(e.target);
-      const isInsidePanel = e.target.closest('.premium-dropdown-panel');
-      const isInsideSearch = e.target.closest('.premium-dropdown-search-wrapper');
-      
-      if (!isInsideTrigger && !isInsidePanel && !isInsideSearch) {
-        setIsOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, []);
-
-  const updatePosition = () => {
-    if (ref.current && isOpen) {
-      const rect = ref.current.getBoundingClientRect();
-      setDropdownStyle({
-        position: 'fixed',
-        top: `${rect.bottom + 12}px`,
-        left: `${rect.left}px`,
-        width: `${rect.width}px`,
-      });
+    if (!initialCategories || initialCategories.length === 0) {
+      axiosClient.get('/faqs/categories').then(res => {
+        setCategories(res.data.categories.map(c => c.name));
+      }).catch(err => console.error('Failed to load categories', err));
+    } else {
+      setCategories(initialCategories);
     }
-  };
+  }, [initialCategories]);
 
-  useEffect(() => {
-    if (isOpen) {
-      updatePosition();
-      // Listen to scroll and resize events
-      window.addEventListener('scroll', updatePosition, true);
-      window.addEventListener('resize', updatePosition);
-    }
-    return () => {
-      window.removeEventListener('scroll', updatePosition, true);
-      window.removeEventListener('resize', updatePosition);
-    };
-  }, [isOpen]);
+  // Build sorted category list: all except "Other" first, then "Other" at bottom
+  const allCategories = categories.length > 0 ? categories : ['General', 'Other'];
+  const filtered = allCategories.filter(c => c.toLowerCase() !== 'other');
+  const sortedCategories = [...filtered, 'Other'];
 
-  // Sync category lists and ALWAYS push "Other" to the very bottom
-  const activeCategories = categories.length > 0 ? categories : FAQ_CATEGORIES;
-  const filtered = activeCategories.filter(cat => cat.toLowerCase() !== 'other');
-  const normalizedCategories = [...filtered, 'Other'];
-
-  const filteredList = normalizedCategories.filter(cat =>
+  const filteredList = sortedCategories.filter(cat =>
     cat.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // Open popover
+  const openPopover = useCallback(() => {
+    if (disabled) return;
+    setIsOpen(true);
+    setSearchTerm('');
+    setHighlightedIndex(0);
+    // Focus search after render
+    setTimeout(() => searchRef.current?.focus(), 20);
+  }, [disabled]);
+
+  // Close popover
+  const closePopover = useCallback(() => {
+    setIsOpen(false);
+    setSearchTerm('');
+  }, []);
+
+  // Click outside
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleClick = (e) => {
+      const inTrigger = triggerRef.current?.contains(e.target);
+      const inPanel = e.target.closest('.cat-popover-panel');
+      if (!inTrigger && !inPanel) closePopover();
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [isOpen, closePopover]);
+
+  // Keyboard navigation
+  const handleKeyDown = useCallback((e) => {
+    if (!isOpen) {
+      if (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        openPopover();
+      }
+      return;
+    }
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        setHighlightedIndex(i => Math.min(i + 1, filteredList.length - 1));
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        setHighlightedIndex(i => Math.max(i - 1, 0));
+        break;
+      case 'Enter':
+        e.preventDefault();
+        if (filteredList[highlightedIndex]) {
+          onChange(filteredList[highlightedIndex]);
+          closePopover();
+        }
+        break;
+      case 'Escape':
+        e.preventDefault();
+        closePopover();
+        break;
+      case 'Tab':
+        e.preventDefault();
+        closePopover();
+        break;
+      default:
+        break;
+    }
+  }, [isOpen, filteredList, highlightedIndex, onChange, openPopover, closePopover]);
+
+  // Scroll highlighted item into view
+  useEffect(() => {
+    if (!isOpen || !listRef.current) return;
+    const item = listRef.current.children[highlightedIndex];
+    item?.scrollIntoView({ block: 'nearest' });
+  }, [highlightedIndex, isOpen]);
+
+  // Reset highlight when search changes
+  useEffect(() => {
+    setHighlightedIndex(0);
+  }, [searchTerm]);
+
+  const selectCategory = (cat) => {
+    onChange(cat);
+    closePopover();
+  };
+
   return (
-    <div className="premium-dropdown-container" ref={ref}>
-      <style dangerouslySetInnerHTML={{ __html: dropdownStyles }} />
-      
+    <div className="cat-popover-wrapper">
+      <style dangerouslySetInnerHTML={{ __html: PopoverStyles }} />
+
+      {/* Trigger */}
       <button
+        ref={triggerRef}
         type="button"
         disabled={disabled}
-        onClick={() => setIsOpen(!isOpen)}
-        className="premium-dropdown-trigger"
+        onClick={isOpen ? closePopover : openPopover}
+        onKeyDown={handleKeyDown}
+        className="cat-popover-trigger"
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
       >
-        <span className={value ? '' : 'placeholder'}>
-          {value || 'Select FAQ category'}
-        </span>
+        {value ? (
+          <span className="cat-popover-selected-tag">
+            {value}
+          </span>
+        ) : (
+          <span className="cat-popover-trigger-placeholder">Select a category</span>
+        )}
         <ChevronDown
-          size={16}
-          className="transition-transform text-slate-400"
-          style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
+          size={15}
+          style={{
+            transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+            transition: 'transform 0.2s',
+            color: '#9ca3af',
+          }}
         />
       </button>
 
-      <AnimatePresence>
-        {isOpen && !disabled && (
-          <>
-            {createPortal(
-              <div className="dropdown-backdrop" onClick={() => setIsOpen(false)} />,
-              document.body
-            )}
-            {createPortal(
-              <motion.div
-                initial={{ opacity: 0, y: -6, scale: 0.98 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -6, scale: 0.98 }}
-                transition={{ duration: 0.15 }}
-                className="premium-dropdown-panel"
-                style={dropdownStyle}
+      {/* Inline Popover Panel */}
+      {isOpen && !disabled && (
+        <div
+          className="cat-popover-panel"
+          role="listbox"
+          aria-label="Category list"
+        >
+          {/* Search bar */}
+          <div className="cat-popover-search">
+            <Search size={14} className="cat-popover-search-icon" />
+            <input
+              ref={searchRef}
+              type="text"
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Search categories…"
+              className="cat-popover-search-input"
+              autoComplete="off"
+              spellCheck={false}
+            />
+            {searchTerm && (
+              <button
+                type="button"
+                className="cat-popover-clear"
+                onClick={() => setSearchTerm('')}
+                tabIndex={-1}
               >
-                {/* Search inside dropdown */}
-                <div className="premium-dropdown-search-container">
-                  <div className="premium-dropdown-search-wrapper">
-                    <Search size={14} className="text-slate-400 flex-shrink-0" />
-                    <input
-                      type="text"
-                      value={searchTerm}
-                      onChange={e => setSearchTerm(e.target.value)}
-                      placeholder="Search categories..."
-                      className="premium-dropdown-search-input"
-                      autoFocus
-                    />
-                  </div>
-                </div>
-
-                {/* Options List */}
-                <div className="premium-dropdown-list">
-                  {filteredList.length === 0 ? (
-                    <div className="premium-dropdown-empty">
-                      No matching categories
-                    </div>
-                  ) : (
-                    filteredList.map(cat => {
-                      const isSelected = value === cat;
-                      return (
-                        <button
-                          key={cat}
-                          type="button"
-                          onClick={() => {
-                            onChange(cat);
-                            setIsOpen(false);
-                            setSearchTerm('');
-                          }}
-                          className={`premium-dropdown-item ${isSelected ? 'selected' : ''}`}
-                        >
-                          <span>{cat}</span>
-                          {isSelected && (
-                            <Check size={14} className="text-purple-400 animate-pulse" />
-                          )}
-                        </button>
-                      );
-                    })
-                  )}
-                </div>
-              </motion.div>,
-              document.body
+                <X size={12} />
+              </button>
             )}
-          </>
-        )}
-      </AnimatePresence>
+          </div>
+
+          {/* Category list */}
+          <div className="cat-popover-list" ref={listRef}>
+            {filteredList.length === 0 ? (
+              <div className="cat-popover-empty">No categories match "{searchTerm}"</div>
+            ) : (
+              filteredList.map((cat, i) => {
+                const isSelected = value === cat;
+                const isHighlighted = i === highlightedIndex;
+                return (
+                  <button
+                    key={cat}
+                    type="button"
+                    role="option"
+                    aria-selected={isSelected}
+                    className={`cat-popover-item${isHighlighted ? ' highlighted' : ''}${isSelected ? ' selected' : ''}`}
+                    onClick={() => selectCategory(cat)}
+                    onMouseEnter={() => setHighlightedIndex(i)}
+                  >
+                    <span>{cat}</span>
+                    {isSelected && <Check size={13} className="cat-popover-check" />}
+                  </button>
+                );
+              })
+            )}
+          </div>
+
+          {/* Keyboard hint */}
+          <div className="cat-popover-hint">
+            ↑↓ navigate · Enter select · Esc close
+          </div>
+        </div>
+      )}
     </div>
   );
 }

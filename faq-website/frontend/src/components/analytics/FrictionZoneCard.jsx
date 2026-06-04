@@ -17,7 +17,7 @@ export default function FrictionZoneCard({ data }) {
       </div>
 
       <div className="space-y-5">
-        {data.map((zone, idx) => (
+        {(data || []).map((zone, idx) => (
           <div key={idx} className="relative p-5 rounded-2xl bg-white/[0.02] border border-white/5 overflow-hidden group hover:border-fuchsia-500/30 transition-all">
             <div className="absolute top-0 right-0 w-32 h-32 bg-fuchsia-500/5 rounded-full blur-[40px] pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity" />
             
@@ -41,7 +41,7 @@ export default function FrictionZoneCard({ data }) {
             </div>
           </div>
         ))}
-        {data.length === 0 && (
+        {(!data || data.length === 0) && (
           <div className="text-slate-500 text-sm font-medium w-full text-center py-6 border border-dashed border-white/10 rounded-2xl">
             No significant friction zones detected.
           </div>

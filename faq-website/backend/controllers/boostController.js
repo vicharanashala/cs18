@@ -12,6 +12,7 @@
 const SemanticCluster  = require('../models/SemanticCluster');
 const PersonalTicket   = require('../models/PersonalTicket');
 const User             = require('../models/User');
+const AuditLog         = require('../models/AuditLog');
 const { recordTransaction } = require('../utils/walletHelper');
 const { create: createNotification } = require('../services/notification.service');
 
@@ -227,6 +228,28 @@ exports.boostTicket = async (req, res, next) => {
       metadata: { ticketId: ticket._id.toString(), boostedUntil: boostedUntil.toISOString() },
     });
 
+    // Audit log — boost activated
+    AuditLog.create({
+      adminId:    req.user.id,
+      adminEmail: req.user.email || `${req.user.id}@boost-action`,
+      action:     'TICKET_BOOSTED',
+      targetType: 'PersonalTicket',
+      targetId:   ticket._id,
+      targetLabel: (ticket.question || '').slice(0, 80),
+      metadata:   { boostedUntil: boostedUntil.toISOString(), pizzaSlicesSpent: BOOST_COST_SLICES },
+    }).catch(err => console.error('[AUDIT ERROR boostTicket]', err.message));
+
+    // Audit log — pizza slice spent
+    AuditLog.create({
+      adminId:    req.user.id,
+      adminEmail: req.user.email || `${req.user.id}@boost-action`,
+      action:     'PIZZA_SLICE_SPENT',
+      targetType: 'PersonalTicket',
+      targetId:   ticket._id,
+      targetLabel: (ticket.question || '').slice(0, 80),
+      metadata:   { amount: BOOST_COST_SLICES, reason: 'boost', ticketId: ticket._id.toString() },
+    }).catch(err => console.error('[AUDIT ERROR boostTicket pizza]', err.message));
+
     return res.json({
       success:      true,
       message:      'Boost activated for 10 minutes.',
@@ -342,6 +365,32 @@ exports.convertToGoldenTicket = async (req, res, next) => {
         spurtiSpent,
       },
     });
+
+    // Audit log — converted to golden ticket
+    AuditLog.create({
+      adminId:    req.user.id,
+      adminEmail: req.user.email || `${req.user.id}@convert-action`,
+      action:     'TICKET_CONVERTED_TO_GOLDEN',
+      targetType: 'PersonalTicket',
+      targetId:   personalTicket._id,
+      targetLabel: (personalTicket.question || '').slice(0, 80),
+      metadata:   {
+        goldenTicketId: gt._id.toString(),
+        spurtiSpent,
+        personalTicketId: personalTicket._id.toString(),
+      },
+    }).catch(err => console.error('[AUDIT ERROR convertToGT]', err.message));
+
+    // Audit log — SP spent
+    AuditLog.create({
+      adminId:    req.user.id,
+      adminEmail: req.user.email || `${req.user.id}@convert-action`,
+      action:     'SPURTI_SPENT',
+      targetType: 'GoldenTicket',
+      targetId:   gt._id,
+      targetLabel: (personalTicket.question || '').slice(0, 80),
+      metadata:   { amount: spurtiSpent, reason: 'golden_ticket_conversion' },
+    }).catch(err => console.error('[AUDIT ERROR convertToGT spurti]', err.message));
 
     return res.status(201).json({
       success:       true,

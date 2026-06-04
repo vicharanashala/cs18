@@ -17,6 +17,16 @@ const semanticClusterSchema = new mongoose.Schema({
   creatorId:  { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   context:    { type: String, required: true },
 
+  attachments: [{
+    fileName:     { type: String, required: true },
+    fileUrl:      { type: String, required: true },
+    fileType:     { type: String, required: true },
+    fileSize:     { type: Number, required: true },
+    duration:     { type: Number, default: null },
+    thumbnailUrl: { type: String, default: null },
+    uploadedBy:   { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  }],
+
   // ── Variant questions that got merged into this cluster ──────────────────
   relatedQueries: { type: [relatedQuerySchema], default: [] },
 
@@ -41,6 +51,11 @@ const semanticClusterSchema = new mongoose.Schema({
   firstAnswerAt: { type: Date, default: null },
   answeredAt:    { type: Date, default: null },
   answerCount:   { type: Number, default: 0 },
+
+  // ── Severity Scoring Engine ─────────────────────────────────────────────
+  severityScore:     { type: Number, default: 0, index: true },
+  priorityLevel:     { type: String, enum: ['LOW', 'MODERATE', 'HIGH', 'URGENT', 'CRITICAL'], default: 'LOW', index: true },
+  severityBreakdown: { type: mongoose.Schema.Types.Mixed, default: {} },
 
   aiGeneratedAnswer: { type: String, default: null },
 

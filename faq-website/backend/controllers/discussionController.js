@@ -27,7 +27,7 @@ async function recalcUrgency() {
 // ─── Submit Ticket ─────────────────────────────────────────────────────────────
 exports.submitTicket = async (req, res, next) => {
   try {
-    const { question, context, category, customCategory } = req.body;
+    const { question, context, category, customCategory, attachments } = req.body;
 
     if (!question || question.trim().split(/\s+/).length < 3)
       return res.status(400).json({ error: 'Question must be at least 3 words.' });
@@ -41,6 +41,11 @@ exports.submitTicket = async (req, res, next) => {
       question, context, req.user.id, 0.82, category, customCategory
     );
 
+    if (isNew && attachments?.length > 0) {
+      cluster.attachments = attachments;
+      await cluster.save();
+    }
+
     const existingSub = await Submission.findOne({ clusterId: cluster._id, userId: req.user.id });
 
     if (!existingSub) {
@@ -51,6 +56,7 @@ exports.submitTicket = async (req, res, next) => {
         context,
         category,
         customCategory,
+        attachments: attachments || [],
       });
       await submission.save();
     }
@@ -87,7 +93,7 @@ exports.submitTicket = async (req, res, next) => {
 
     const ticketNumber = await ticketService.createTicket(
       req.user.id, question, 'general',
-      existingSub?._id || submission?._id, category
+      existingSub?._id || submission?._id, category, 0
     );
 
     res.json({
@@ -209,6 +215,7 @@ exports.getClusters = async (req, res, next) => {
       .select('-embedding')
       .populate('participants.userId', '_id username email reputation')
       .populate('relatedQueries.userId', '_id username email reputation')
+      .populate('attachments.uploadedBy', 'username email')
       .lean();
 
     // Attach variants count and ensure relatedQueries exists
@@ -280,6 +287,7 @@ exports.getClusterById = async (req, res, next) => {
       .select('-embedding')
       .populate('participants.userId', '_id username email reputation')
       .populate('relatedQueries.userId', '_id username email reputation')
+      .populate('attachments.uploadedBy', 'username email')
       .lean();
 
     if (!cluster) return res.status(404).json({ error: 'Cluster not found' });
@@ -297,6 +305,7 @@ exports.getClusterById = async (req, res, next) => {
 
     const answers = await Answer.find({ clusterId: req.params.id })
       .populate('userId', '_id email reputation')
+      .populate('attachments.uploadedBy', 'username email')
       .lean();
 
     cluster.hasAnswered = !!(

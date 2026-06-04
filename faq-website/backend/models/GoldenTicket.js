@@ -46,6 +46,11 @@ const goldenTicketSchema = new mongoose.Schema(
       default: false,
     },
     knowledgeCaptured: { type: Boolean, default: false },
+
+    // ── Severity Scoring Engine ─────────────────────────────────────────────
+    severityScore: { type: Number, default: 0, index: true },
+    priorityLevel: { type: String, enum: ['LOW', 'MODERATE', 'HIGH', 'URGENT', 'CRITICAL'], default: 'LOW', index: true },
+    severityBreakdown: { type: mongoose.Schema.Types.Mixed, default: {} },
   },
   { timestamps: true }
 );

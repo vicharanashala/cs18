@@ -5,6 +5,7 @@ const { extractPersonalIntent } = require('../utils/intentExtractor');
 const getEmbedding = require('../utils/embedding');
 const { cosineSimilarity } = require('../utils/clustering');
 const ticketService = require('../services/ticket.service');
+const { calculateSeverity } = require('../utils/severityEngine');
 
 // STEP 1, 2, 3: Resolve Personal Issue (Deterministic Deflection & Duplicate Detection)
 exports.resolvePersonalIssue = async (req, res) => {
@@ -113,13 +114,18 @@ exports.resolvePersonalIssue = async (req, res) => {
         institution,
         status: 'submitted',
         normalizedIntent: question,
-        priorityScore
+        priorityScore,
+        attachments: req.body.attachments || []
       });
+      const severity = calculateSeverity(ticket);
+      ticket.severityScore = severity.severityScore;
+      ticket.priorityLevel = severity.priorityLevel;
+      ticket.severityBreakdown = severity.severityBreakdown;
       await ticket.save();
 
       // Generate Tracker Ticket
       const ticketService = require('../services/ticket.service');
-      const ticketNumber = await ticketService.createTicket(req.user.id, question, 'personal', ticket._id);
+      const ticketNumber = await ticketService.createTicket(req.user.id, question, 'personal', ticket._id, reqCategory || 'General', Math.min(100, priorityScore * 1.5));
 
       return res.json({
         status: 'LOW',
@@ -161,13 +167,18 @@ exports.escalatePersonalIssue = async (req, res) => {
       institution: user.institution || 'General',
       status: 'submitted',
       normalizedIntent: question,
-      priorityScore
+      priorityScore,
+      attachments: req.body.attachments || []
     });
+    const severity = calculateSeverity(ticket);
+    ticket.severityScore = severity.severityScore;
+    ticket.priorityLevel = severity.priorityLevel;
+    ticket.severityBreakdown = severity.severityBreakdown;
     await ticket.save();
 
     // Generate Tracker Ticket
     const ticketService = require('../services/ticket.service');
-    const ticketNumber = await ticketService.createTicket(req.user.id, question, 'personal', ticket._id, category || 'General');
+    const ticketNumber = await ticketService.createTicket(req.user.id, question, 'personal', ticket._id, category || 'General', Math.min(100, priorityScore * 1.5));
 
     res.json({
       message: 'Escalated to an admin successfully. You will receive a response within 24 hours.',
@@ -221,13 +232,18 @@ exports.feedbackPersonalIssue = async (req, res) => {
         status: 'submitted',
         normalizedIntent: normalizedIntent || question,
         quirks: `Deflection Failed for matched ID: ${matchId} (Type: ${type})`,
-        priorityScore
+        priorityScore,
+        attachments: req.body.attachments || []
       });
+      const severity = calculateSeverity(ticket);
+      ticket.severityScore = severity.severityScore;
+      ticket.priorityLevel = severity.priorityLevel;
+      ticket.severityBreakdown = severity.severityBreakdown;
       await ticket.save();
 
       // Generate Tracker Ticket
       const ticketService = require('../services/ticket.service');
-      const ticketNumber = await ticketService.createTicket(req.user.id, question, 'personal', ticket._id);
+      const ticketNumber = await ticketService.createTicket(req.user.id, question, 'personal', ticket._id, category || 'General', Math.min(100, priorityScore * 1.5));
 
       res.json({
         message: 'Your ticket has been escalated to an admin due to resolution mismatch.',
@@ -247,9 +263,16 @@ exports.getPersonalIssue = async (req, res) => {
     if (!ticket) return res.status(404).json({ error: 'Ticket not found.' });
 
     // Fetch the linked ticket to get the tracking number
-    const tracker = await require('../models/Ticket').findOne({ referenceId: ticket._id });
+    const tracker = await require('../models/Ticket').findOne({ referenceId: ticket._id }).populate('assignedMentor', 'fullName username email');
     if (tracker) {
       ticket.ticketNumber = tracker.ticketNumber;
+      ticket.trackerInfo = {
+        autoRouted: tracker.autoRouted,
+        routingReason: tracker.routingReason,
+        assignedMentor: tracker.assignedMentor,
+        assignedAt: tracker.assignedAt,
+        acceptedAt: tracker.acceptedAt
+      };
     }
 
     res.json({ ticket });

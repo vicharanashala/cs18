@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, memo, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import axiosClient from '../api/axiosClient';
+import { useAuthMe, usePublishedFaqs, useDiscussionClusters, useFaqCategories } from '../hooks/useQueries';
 import toast from 'react-hot-toast';
 import Avatar from '../components/Avatar';
 import JoinedUsersAccordion from '../components/JoinedUsersAccordion';
@@ -14,7 +15,7 @@ import {
 import HelpfulFeedback from '../components/HelpfulFeedback';
 import { motion, AnimatePresence } from 'framer-motion';
 import BannedUserBanner from '../components/BannedUserBanner';
-import { FAQ_CATEGORIES, normalizeCategory } from '../utils/constants';
+import { normalizeCategory } from '../utils/constants';
 
 // Inline pizza slice SVG icon — no emojis, no Lucide Pizza
 function PizzaSliceIcon({ size = 16, className = '' }) {
@@ -635,7 +636,7 @@ const AnswerCard = memo(function AnswerCard({ answer, consensusLocked, onDeleted
 });
 
 // ─── Discussion Thread Panel ──────────────────────────────────────────────────
-function DiscussionPanel({ clusterId, user, onBack, refreshClusters, onRaiseTicket }) {
+function DiscussionPanel({ clusterId, user, onBack, refreshClusters, onRaiseTicket, onMarkVisited }) {
   const [cluster, setCluster] = useState(null);
   const [answers, setAnswers] = useState([]);
   const [answerCount, setAnswerCount] = useState(0);
@@ -695,11 +696,7 @@ function DiscussionPanel({ clusterId, user, onBack, refreshClusters, onRaiseTick
       setMyAnswer('');
       toast.success('Answer posted!');
       // Mark this cluster as visited so it sinks below on next visit
-      setVisitedClusterIds(prev => {
-        const next = new Set(prev);
-        next.add(clusterId);
-        return next;
-      });
+      if (onMarkVisited) onMarkVisited(clusterId);
       fetchDiscussion();
     } catch (err) {
       toast.error(err.response?.data?.message || err.response?.data?.error || 'Failed to post');
@@ -932,15 +929,17 @@ function DiscussionPanel({ clusterId, user, onBack, refreshClusters, onRaiseTick
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
 export default function Dashboard() {
   const navigate = useNavigate();
-  const [user, setUser] = useState(null);
+  const { data: user } = useAuthMe();
+  const { data: faqsData = [], isError: faqsError } = usePublishedFaqs();
+  const { data: clustersData = [], isError: discussionsError, refetch: refreshClusters } = useDiscussionClusters();
+  const { data: categoriesData = [] } = useFaqCategories();
   
-  // Data States
-  const [faqs, setFaqs] = useState([]);
-  const [faqsError, setFaqsError] = useState(false);
-  const [clusters, setClusters] = useState([]);
+  const faqs = faqsData;
+  const clusters = clustersData;
+  const categories = categoriesData.map(c => c.name);
+
   const [urgentClusters, setUrgentClusters] = useState([]);
   const [visitedClusterIds, setVisitedClusterIds] = useState(new Set());
-  const [discussionsError, setDiscussionsError] = useState(false);
   
   // Search States
   const [isSearching, setIsSearching] = useState(false);
@@ -987,21 +986,7 @@ export default function Dashboard() {
   }, [activeTab, activeCluster]);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  useEffect(() => {
-    const userController = new AbortController();
-    const faqsController = new AbortController();
-    const clustersController = new AbortController();
 
-    fetchUser({ signal: userController.signal });
-    fetchFaqs({ signal: faqsController.signal });
-    fetchClusters({ signal: clustersController.signal });
-
-    return () => {
-      userController.abort();
-      faqsController.abort();
-      clustersController.abort();
-    };
-  }, []);
 
   // Auto-scroll logic for category jumping
   useEffect(() => {
@@ -1014,45 +999,6 @@ export default function Dashboard() {
       }, 100);
     }
   }, [targetCategory, activeTab, searchQuery]);
-
-  const fetchUser = async (options = {}) => {
-    try { 
-      const r = await axiosClient.get('/auth/me', { timeout: 10000, signal: options.signal }); 
-      setUser(r.data.user); 
-    } catch (err) { 
-      if (!axiosClient.isCancel?.(err) && err.name !== 'CanceledError') {
-        toast.error('Failed to load user profile'); 
-      }
-    }
-  };
-
-  const fetchFaqs = async (options = {}) => {
-    try { 
-      const r = await axiosClient.get('/faqs', { timeout: 10000, signal: options.signal }); 
-      setFaqs(r.data.faqs || []); 
-      setFaqsError(false);
-    } catch (err) { 
-      if (!axiosClient.isCancel?.(err) && err.name !== 'CanceledError') {
-        console.error('[FAQs Fetch Error]', err);
-        setFaqsError(true);
-        toast.error('Failed to load FAQs'); 
-      }
-    }
-  };
-
-  const fetchClusters = async (options = {}) => {
-    try { 
-      const r = await axiosClient.get('/discussions/clusters', { timeout: 10000, signal: options.signal }); 
-      setClusters(r.data.clusters || []); 
-      setDiscussionsError(false);
-    } catch (err) { 
-      if (!axiosClient.isCancel?.(err) && err.name !== 'CanceledError') {
-        console.error('[Clusters Fetch Error]', err);
-        setDiscussionsError(true);
-        toast.error('Failed to load questions'); 
-      }
-    }
-  };
 
   // ── Derived: sorted + shuffled cluster list ─────────────────────────────────
   const sortedClusters = useMemo(() => buildSortedClusters({
@@ -1155,7 +1101,7 @@ export default function Dashboard() {
             >
               <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3 px-2 font-bricolage">Categories</h3>
               <div className="space-y-1.5">
-                {FAQ_CATEGORIES.map(catName => {
+                {categories.map(catName => {
                   return (
                     <button 
                       key={catName}
@@ -1394,11 +1340,11 @@ export default function Dashboard() {
                         </div>
                         <h3 className="text-lg font-bold text-slate-200 mb-2 font-bricolage">Unable to load FAQs</h3>
                         <p className="text-slate-400 text-sm max-w-md">We're having trouble connecting to the server. You can still search offline cached items or try again later.</p>
-                        <button onClick={fetchFaqs} className="mt-6 text-emerald-400 font-bold text-sm hover:underline">Retry Connection</button>
+                        <button onClick={refreshClusters} className="mt-6 text-emerald-400 font-bold text-sm hover:underline">Retry Connection</button>
                       </div>
                     ) : (
                       <>
-                        {FAQ_CATEGORIES.map(catName => {
+                        {categories.map(catName => {
                           return (
                             <CategoryCard 
                               key={catName} 
@@ -1477,7 +1423,7 @@ export default function Dashboard() {
                         </div>
                         <h3 className="text-lg font-bold text-slate-200 mb-2 font-bricolage">Unable to load questions</h3>
                         <p className="text-slate-400 text-sm max-w-md">We're having trouble connecting to the server. Please try again later.</p>
-                        <button onClick={fetchClusters} className="mt-6 text-emerald-400 font-bold text-sm hover:underline">Retry Connection</button>
+                        <button onClick={refreshClusters} className="mt-6 text-emerald-400 font-bold text-sm hover:underline">Retry Connection</button>
                       </div>
                     ) : clusters.length === 0 ? (
                       <div className="text-center py-24 text-slate-500 font-medium font-bricolage">No active questions yet. Be the first!</div>
@@ -1497,8 +1443,9 @@ export default function Dashboard() {
                 clusterId={activeCluster}
                 user={user}
                 onBack={() => setActiveCluster(null)}
-                refreshClusters={fetchClusters}
+                refreshClusters={refreshClusters}
                 onRaiseTicket={() => navigate('/raise-ticket')}
+                onMarkVisited={(id) => setVisitedClusterIds(prev => new Set(prev).add(id))}
               />
             )}
           </main>

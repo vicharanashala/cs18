@@ -1,10 +1,10 @@
 const mongoose = require('mongoose');
-const { FAQ_CATEGORIES } = require('../utils/constants');
+
 
 const faqSchema = new mongoose.Schema({
   embedding: { type: [Number], select: false },
   clusterId: { type: mongoose.Schema.Types.ObjectId, ref: 'SemanticCluster' },
-  category: { type: String, enum: FAQ_CATEGORIES, default: 'Other' },
+  category: { type: String, default: 'Other' },
   customCategory: { type: String },
   hashtags: { type: [String], default: [] },
   question: { type: String, required: true },
@@ -28,7 +28,18 @@ const faqSchema = new mongoose.Schema({
   
   // Memory Decay Tracking
   lastValidatedAt: { type: Date, default: Date.now },
-  freshnessScore: { type: Number, default: 100 }
+  freshnessScore: { type: Number, default: 100 },
+
+  // Attachments approved by admins
+  attachments: [{
+    fileName:     { type: String, required: true },
+    fileUrl:      { type: String, required: true },
+    fileType:     { type: String, required: true },
+    fileSize:     { type: Number, required: true },
+    duration:     { type: Number, default: null },
+    thumbnailUrl: { type: String, default: null },
+    uploadedBy:   { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  }],
 }, { timestamps: true });
 
 faqSchema.pre('save', async function () {

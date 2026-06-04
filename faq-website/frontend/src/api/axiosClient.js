@@ -25,16 +25,16 @@ const axiosClient = axios.create({
 
 // Configure robust retry logic with exponential backoff
 axiosRetry(axiosClient, {
-  retries: 3, // Number of retries
+  retries: 3,
   retryDelay: (retryCount) => {
-    return Math.min(1000 * (2 ** retryCount), 10000); // 2s, 4s, 8s (max 10s)
+    return Math.min(1000 * (2 ** retryCount), 10000);
   },
   retryCondition: (error) => {
-    // Retry on Network Errors or 5xx Server Errors
-    if (error.config && error.config.url && error.config.url.includes('/auth/login')) {
-      return false;
-    }
-    return axiosRetry.isNetworkOrIdempotentRequestError(error) || 
+    // Never retry auth requests or 4xx errors
+    if (error.config?.url?.includes('/auth/login')) return false;
+    if (error.response?.status === 401) return false;   // ← don't retry invalid-token requests
+    if (error.response?.status === 403) return false;
+    return axiosRetry.isNetworkOrIdempotentRequestError(error) ||
            (error.response && error.response.status >= 500);
   }
 });
@@ -49,7 +49,7 @@ axiosClient.interceptors.request.use(config => {
   config.url = urlPath;
   
   const fullUrl = `${config.baseURL}${config.url}`;
-  console.log("Calling API:", fullUrl);
+  
 
   const token = localStorage.getItem('token');
   if (token) {
@@ -68,13 +68,24 @@ axiosClient.interceptors.response.use(
     
     // Eliminate noisy 500 spam by only logging structured trace data in dev
     if (isDev && error.response) {
-      console.warn(`[API WARNING] ${error.config?.url} failed with ${error.response.status}. TraceID: ${error.response.data?.traceId || 'unknown'}`);
+      // Suppress known 401/403 log spam
+      const status = error.response.status;
+      const url = error.config?.url || '';
+      const isExpectedAuthError = (status === 401 && url.includes('/auth/me')) || 
+                                  (status === 403 && url.includes('/admin/'));
+      
+      if (!isExpectedAuthError) {
+        console.warn(`[API WARNING] ${url} failed with ${status}. TraceID: ${error.response.data?.traceId || 'unknown'}`);
+      }
     }
 
     if (error.response?.status === 401) {
-      localStorage.removeItem('token');
-      // Dispatch a custom event so the UI can redirect without reloading the page violently
-      window.dispatchEvent(new Event('auth-expired'));
+      const url = error.config?.url || '';
+      if (!url.includes('/auth/me') && !url.includes('/auth/login')) {
+        localStorage.removeItem('token');
+        // Dispatch a custom event so the UI can redirect without reloading the page violently
+        window.dispatchEvent(new Event('auth-expired'));
+      }
     }
 
     if (error.response?.status === 429) {

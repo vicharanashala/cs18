@@ -5,7 +5,7 @@ import TrackQueryCard from './TrackQueryCard';
 import axiosClient from '../api/axiosClient';
 import toast from 'react-hot-toast';
 
-export default function TrackQuerySection({ refreshTrigger, canConvertToGT, userPizzaSlices, onGTConverted }) {
+export default function TrackQuerySection({ refreshTrigger, canConvertToGT, userPizzaSlices, userSpurtiPoints = 0, currentUserId = null, onGTConverted }) {
   const [tickets, setTickets] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchInput, setSearchInput] = useState('');
@@ -80,10 +80,10 @@ export default function TrackQuerySection({ refreshTrigger, canConvertToGT, user
       <div className="glass-card rounded-3xl p-6 md:p-8 border border-emerald-900/30 relative overflow-hidden bg-gradient-to-b from-white/[0.02] to-transparent shadow-[0_0_40px_rgba(16,185,129,0.03)]">
         <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/5 rounded-full blur-[60px] pointer-events-none -translate-y-1/2 translate-x-1/3" />
 
-        <div className="flex flex-col md:flex-row gap-8 relative z-10">
+        <div className="grid grid-cols-1 lg:grid-cols-[35%_65%] gap-8 relative z-10 w-full">
           
           {/* Track Input */}
-          <div className="w-full md:w-1/3 flex flex-col justify-center">
+          <div className="flex flex-col justify-center">
             <h2 className="font-bold font-bricolage text-xl text-slate-800 dark:text-slate-100 mb-2">Track Status</h2>
             <p className="text-slate-600 dark:text-slate-400 text-sm mb-5 leading-relaxed">Enter your 8-character ticket ID to check real-time resolution status.</p>
             
@@ -111,12 +111,9 @@ export default function TrackQuerySection({ refreshTrigger, canConvertToGT, user
             </form>
           </div>
 
-          {/* Vertical divider */}
-          <div className="hidden md:block w-px bg-gradient-to-b from-transparent via-white/10 to-transparent mx-2" />
-          <div className="md:hidden h-px bg-gradient-to-r from-transparent via-white/10 to-transparent my-2" />
 
           {/* Results / List */}
-          <div className="w-full md:w-2/3">
+          <div className="w-full min-w-0">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-bold font-bricolage text-sm text-slate-700 dark:text-slate-300">
                 {searchedTicket ? 'Search Result' : 'Recent Tickets'}
@@ -139,6 +136,8 @@ export default function TrackQuerySection({ refreshTrigger, canConvertToGT, user
                     onDeleteSuccess={handleRemoveTicket}
                     canConvertToGT={canConvertToGT}
                     userPizzaSlices={userPizzaSlices}
+                    userSpurtiPoints={userSpurtiPoints}
+                    currentUserId={currentUserId}
                     onGTConverted={onGTConverted}
                   />
                 ) : tickets.length > 0 ? (
@@ -151,6 +150,8 @@ export default function TrackQuerySection({ refreshTrigger, canConvertToGT, user
                       onDeleteSuccess={handleRemoveTicket}
                       canConvertToGT={canConvertToGT}
                       userPizzaSlices={userPizzaSlices}
+                      userSpurtiPoints={userSpurtiPoints}
+                      currentUserId={currentUserId}
                       onGTConverted={onGTConverted}
                     />
                   ))

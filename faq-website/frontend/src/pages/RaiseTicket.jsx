@@ -3,10 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import axiosClient from '../api/axiosClient';
 import toast from 'react-hot-toast';
 import {
-  MessageSquare, Book, Wallet, LogOut, X, Search,
+  MessageSquare, Wallet, LogOut, X, Search,
   Menu, ChevronDown, ChevronUp, Lock, Users, ChevronRight, Check,
   Sparkles, Send, ArrowRight, Plus, Pizza
-} from 'lucide-react';
+, Book } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import GoldenTicketIcon from '../components/GoldenTicketIcon';
 import BannedUserBanner from '../components/BannedUserBanner';
@@ -15,8 +15,10 @@ import SearchBar from '../components/SearchBar';
 import Avatar from '../components/Avatar';
 import CategoryDropdown, { FALLBACK_CATEGORIES } from '../components/CategoryDropdown';
 import TrackQuerySection from '../components/TrackQuerySection';
+import AttachmentUpload from '../components/AttachmentUpload';
 import { formatPizzas } from '../utils/pizzaFormatter';
 import { useBannedTheme } from '../hooks/useBannedTheme';
+import StaffToolsNav from '../components/StaffToolsNav';
 
 function PizzaSliceIcon({ size = 16, className = '' }) {
   return (
@@ -45,9 +47,9 @@ function FaqSearchResultCard({ faq, matchType }) {
               {faq.matchPercentage}% match
             </span>
           )}
-          {faq.categoryId?.name && (
+          {faq.category && (
             <span className="text-[10px] font-bold font-bricolage text-slate-400 bg-white/5 px-2.5 py-1 rounded-full border border-white/5 whitespace-nowrap hidden sm:block">
-              {faq.categoryId.name}
+              {faq.category}
             </span>
           )}
           {expanded ? <ChevronUp size={16} className="text-slate-500" /> : <ChevronDown size={16} className="text-slate-500" />}
@@ -77,7 +79,7 @@ function DiscussionResultCard({ cluster }) {
     >
       <div className="flex justify-between items-start gap-4 mb-2">
         <h3 className="font-bold font-bricolage text-[0.95rem] text-slate-100 group-hover:text-pink-300 transition-colors">
-          {cluster.canonicalQuestion}
+          {cluster.canonicalQuestion || cluster.question}
         </h3>
         <div className="flex items-center gap-2 flex-shrink-0">
           {cluster.matchPercentage && (
@@ -123,6 +125,7 @@ export default function RaiseTicket() {
   const [customCategory, setCustomCategory] = useState('');
   const [title, setTitle] = useState('');
   const [context, setContext] = useState('');
+  const [attachments, setAttachments] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Resolution feedback state
@@ -203,7 +206,8 @@ export default function RaiseTicket() {
           question: title,
           context: context,
           category,
-          customCategory
+          customCategory,
+          attachments,
         });
         toast.success(res.data.message || 'General query registered.');
         
@@ -211,6 +215,7 @@ export default function RaiseTicket() {
         setContext('');
         setCategory('');
         setCustomCategory('');
+        setAttachments([]);
         setTrackingRefresh(prev => prev + 1);
         navigate('/dashboard');
       } else {
@@ -219,7 +224,8 @@ export default function RaiseTicket() {
           question: title,
           context: context,
           category,
-          customCategory
+          customCategory,
+          attachments,
         });
         
         const data = res.data;
@@ -245,7 +251,7 @@ export default function RaiseTicket() {
   const handlePersonalFeedback = async (helpful, matchId) => {
     try {
       setIsSubmitting(true);
-      await axiosClient.post('/personal-issues/feedback', {
+      const res = await axiosClient.post('/personal-issues/feedback', {
         matchId: matchId || personalResolution?.bestMatch?._id,
         type: selectedMatch?.type || 'faq',
         helpful,
@@ -269,6 +275,7 @@ export default function RaiseTicket() {
       setContext('');
       setCategory('');
       setCustomCategory('');
+      setAttachments([]);
       setTrackingRefresh(prev => prev + 1);
 
       if (!helpful && res.data.ticketId) {
@@ -303,6 +310,7 @@ export default function RaiseTicket() {
       setContext('');
       setCategory('');
       setCustomCategory('');
+      setAttachments([]);
       setTrackingRefresh(prev => prev + 1);
 
       if (res.data.ticketId) {
@@ -335,7 +343,7 @@ export default function RaiseTicket() {
 
   const navSection = (close = () => {}) => (
     <nav className="space-y-1.5">
-      <NavItem icon={Book} label="FAQ" active={false} onClick={() => { navigate('/faq'); close(); }} />
+      <NavItem icon={Book} label="FAQ" active={false} onClick={() => { navigate('/faqs'); close(); }} />
       <NavItem icon={MessageSquare} label="Once Asked Questions" active={false} onClick={() => { navigate('/discussions'); close(); }} />
       <NavItem icon={Wallet} label="Wallet" active={false} onClick={() => { navigate('/wallet'); close(); }} />
       <div className="pt-3 space-y-2 border-t border-white/5 mt-3">
@@ -357,6 +365,7 @@ export default function RaiseTicket() {
           <span className="drop-shadow-md tracking-wide">Golden Ticket</span>
         </button>
       </div>
+      <StaffToolsNav close={close} />
     </nav>
   );
 
@@ -408,10 +417,10 @@ export default function RaiseTicket() {
         <div>
           <div className="flex items-center justify-between mb-10 px-2">
             <div className="flex items-center gap-2.5 cursor-pointer" onClick={() => navigate('/dashboard')}>
-              <div className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center shadow-md transition-colors hover:bg-white/10">
-                <Book size={16} className="text-slate-300" strokeWidth={2} />
-              </div>
-              <span className="font-bold font-bricolage text-xl text-slate-100 tracking-tight">FAQ Hive</span>
+              <div className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center">
+              <Book size={16} className="text-slate-300" strokeWidth={2} />
+            </div>
+            <span className="font-bold font-bricolage text-lg text-slate-100">FAQ Hive</span>
             </div>
             <ThemeToggle />
           </div>
@@ -440,7 +449,7 @@ export default function RaiseTicket() {
 
       {/* ── Main content ── */}
       <div className="flex-1 overflow-y-auto scroll-smooth pt-16 md:pt-0">
-        <main className="p-6 md:p-10 lg:py-12 max-w-3xl mx-auto space-y-6">
+        <main className="p-6 md:p-10 lg:py-12 w-full max-w-[1400px] mx-auto space-y-6">
           
           <h1 className="font-bold font-bricolage text-2xl md:text-3xl text-slate-100 mb-8">Raise a Ticket</h1>
 
@@ -450,6 +459,8 @@ export default function RaiseTicket() {
               !!user && (!user.goldenTicketCooldownUntil || new Date(user.goldenTicketCooldownUntil) < new Date())
             }
             userPizzaSlices={user?.pizzaSlices ?? 0}
+            userSpurtiPoints={user?.spurtiPoints ?? 0}
+            currentUserId={user?._id}
             onGTConverted={() => {}}
           />
 
@@ -706,6 +717,14 @@ export default function RaiseTicket() {
                         value={context} onChange={e => setContext(e.target.value)}
                       />
                       <div className="text-right mt-1.5 text-[11px] font-semibold text-slate-500 font-bricolage">{context.length} / 800</div>
+                    </div>
+
+                    {/* Attachments */}
+                    <div>
+                      <AttachmentUpload
+                        attachments={attachments}
+                        onChange={setAttachments}
+                      />
                     </div>
 
                     <div className="pt-6 flex items-center justify-between border-t border-white/5">

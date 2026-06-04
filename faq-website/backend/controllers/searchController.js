@@ -10,6 +10,7 @@ const FAQ = require('../models/FAQ');
 const SemanticCluster = require('../models/SemanticCluster');
 const ContributedFAQ = require('../models/ContributedFAQ');
 const { searchFAQs, normalizeQuery, clusterSimilarQuestions, deduplicateFeedItems, generateSuggestions } = require('../utils/searchUtils');
+const SearchAnalytics = require('../models/SearchAnalytics');
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 
@@ -155,7 +156,6 @@ exports.performSearch = async (req, res) => {
     }
 
     // Async analytics (fire-and-forget)
-    const SearchAnalytics = require('../models/SearchAnalytics');
     const safeLog = async () => {
       try {
         await SearchAnalytics.create({
@@ -176,6 +176,24 @@ exports.performSearch = async (req, res) => {
   } catch (err) {
     console.error('[SEARCH ERROR]', err);
     res.status(500).json({ error: 'Search failed. Please try again.' });
+  }
+};
+
+// ─── POPULAR SEARCHES ─────────────────────────────────────────────────────────
+exports.getPopularSearches = async (req, res) => {
+  try {
+    const { type = 'all' } = req.query;
+    const recent = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const match = type === 'all' ? {} : { type };
+    const top = await SearchAnalytics.aggregate([
+      { $match: { ...match, searchedAt: { $gte: recent } } },
+      { $group: { _id: '$query', count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+      { $limit: 8 },
+    ]);
+    return res.json({ popular: top.map(t => t._id) });
+  } catch {
+    return res.json({ popular: [] });
   }
 };
 

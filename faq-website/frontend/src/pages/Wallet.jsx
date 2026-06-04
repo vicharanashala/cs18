@@ -14,6 +14,7 @@ import PizzaSliceSVG from '../components/PizzaSliceSVG';
 import { formatPizzas } from '../utils/pizzaFormatter';
 import Avatar from '../components/Avatar';
 import { useBannedTheme, useIsBanned } from '../hooks/useBannedTheme';
+import StaffToolsNav from '../components/StaffToolsNav';
 
 const SLICES_PER_SP = 6;
 
@@ -188,7 +189,7 @@ export default function WalletPage() {
       ]);
       setBalance(balRes.data);
 
-      const mappedTransactions = histRes.data.transactions.map(tx => ({
+      const mappedTransactions = (histRes.data.transactions || []).map(tx => ({
         ...tx,
         tags: (tx.tags && tx.tags.length > 0) ? tx.tags : getTransactionTags(tx)
       }));
@@ -292,7 +293,7 @@ export default function WalletPage() {
 
   const navSection = (close = () => {}) => (
     <nav className="space-y-1.5">
-      <NavItem icon={Book} label="FAQ" active={false} onClick={() => { navigate('/faq'); close(); }} />
+      <NavItem icon={Book} label="FAQ" active={false} onClick={() => { navigate('/faqs'); close(); }} />
       <NavItem icon={MessageSquare} label="Once Asked Questions" active={false} onClick={() => { navigate('/discussions'); close(); }} />
       <NavItem icon={Wallet} label="Wallet" active={true} onClick={() => { navigate('/wallet'); close(); }} />
       <div className="pt-3 space-y-2 border-t border-white/5 mt-3">
@@ -308,6 +309,7 @@ export default function WalletPage() {
           <span className="drop-shadow-md tracking-wide">Golden Ticket</span>
         </button>
       </div>
+      <StaffToolsNav close={close} />
     </nav>
   );
 
@@ -362,10 +364,10 @@ export default function WalletPage() {
         <div>
           <div className="flex items-center justify-between mb-10 px-2">
             <div className="flex items-center gap-2.5 cursor-pointer" onClick={() => navigate('/dashboard')}>
-              <div className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center shadow-md transition-colors hover:bg-white/10">
-                <Book size={16} className="text-slate-300" strokeWidth={2} />
-              </div>
-              <span className="font-bold font-bricolage text-xl text-slate-100 tracking-tight">FAQ Hive</span>
+              <div className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center">
+              <Book size={16} className="text-slate-300" strokeWidth={2} />
+            </div>
+            <span className="font-bold font-bricolage text-lg text-slate-100">FAQ Hive</span>
             </div>
             <ThemeToggle />
           </div>
@@ -487,7 +489,7 @@ export default function WalletPage() {
               </div>
             ) : (
               <div className="divide-y divide-white/5">
-                {filteredTransactions.map(tx => {
+                {(filteredTransactions || []).map(tx => {
                   const styles = getTransactionStyle(tx);
                   const tags = tx.tags || [];
                   const isCredit = tx.direction === 'credit' || (tx.amount > 0 && !tags.includes('sp_spent'));

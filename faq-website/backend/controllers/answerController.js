@@ -2,6 +2,7 @@ const Answer = require('../models/Answer');
 const SemanticCluster = require('../models/SemanticCluster');
 const User = require('../models/User');
 const { generateConsensus } = require('../utils/consensus');
+const expertiseService = require('../services/expertise.service');
 
 // ─── Helper: get answer count and consensus lock state ────────────────────────
 async function getAnswerCount(clusterId) {
@@ -14,7 +15,7 @@ const CONSENSUS_LOCK_THRESHOLD = 9; // >= 9 answers → locked
 // ─── Submit answer ────────────────────────────────────────────────────────────
 exports.submitAnswer = async (req, res) => {
   try {
-    const { clusterId, text } = req.body;
+    const { clusterId, text, attachments } = req.body;
 
     if (!text || text.trim().length < 3) {
       return res.status(400).json({ success: false, message: 'Answer is too short.' });
@@ -58,9 +59,14 @@ exports.submitAnswer = async (req, res) => {
       userId: req.user.id,
       clusterId,
       text: text.trim(),
-      userReputationAtTimeOfPost: user.reputation
+      userReputationAtTimeOfPost: user.reputation,
+      attachments: attachments || [],
     });
     await answer.save();
+
+    // ── Expertise tracking: Answer Given ────────────────────────────────────
+    const responseTimeMs = Date.now() - cluster.createdAt.getTime();
+    await expertiseService.recordAnswer(req.user.id, cluster.category, responseTimeMs);
 
     // ── Urgency tracking ────────────────────────────────────────────────
     const newCount = currentCount + 1;
@@ -134,6 +140,39 @@ exports.deleteAnswer = async (req, res) => {
     }
 
     res.json({ success: true, message: 'Answer deleted.' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// ─── Vote answer helpful ──────────────────────────────────────────────────────
+exports.voteAnswer = async (req, res) => {
+  try {
+    const answer = await Answer.findById(req.params.id);
+    if (!answer) return res.status(404).json({ success: false, message: 'Answer not found.' });
+
+    // Users cannot vote on their own answers
+    if (answer.userId.toString() === req.user.id) {
+      return res.status(403).json({ success: false, message: 'You cannot upvote your own answer.' });
+    }
+
+    // Check if already voted
+    const alreadyVoted = answer.helpfulVoters && answer.helpfulVoters.some(vId => vId.toString() === req.user.id);
+    if (alreadyVoted) {
+      return res.status(400).json({ success: false, message: 'You have already marked this answer as helpful.' });
+    }
+
+    answer.helpfulVotes = (answer.helpfulVotes || 0) + 1;
+    if (!answer.helpfulVoters) answer.helpfulVoters = [];
+    answer.helpfulVoters.push(req.user.id);
+    await answer.save();
+
+    const cluster = await SemanticCluster.findById(answer.clusterId);
+    if (cluster) {
+      await expertiseService.recordHelpfulVote(answer.userId, cluster.category);
+    }
+
+    res.json({ success: true, message: 'Answer marked as helpful.', helpfulVotes: answer.helpfulVotes });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

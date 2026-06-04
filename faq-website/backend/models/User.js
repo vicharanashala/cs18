@@ -19,8 +19,34 @@ const userSchema = new mongoose.Schema(
 
     role: {
       type: String,
-      enum: ['student', 'admin'],
-      default: 'student',
+      enum: ['user', 'mentor', 'admin'],
+      default: 'user',
+    },
+
+    // Categories this mentor/SME owns
+    mentorCategories: {
+      type: [String],
+      default: [],
+    },
+
+    // Status flags
+    isSuspended: { type: Boolean, default: false },
+    suspendedUntil: { type: Date, default: null },
+    isBanned: { type: Boolean, default: false },
+    bannedAt: { type: Date, default: null },
+
+    // Profile
+    bio: { type: String, default: '' },
+    avatarColor: { type: String, default: null }, // hex color for avatar bg
+
+    username: {
+      type: String,
+      trim: true,
+    },
+
+    fullName: {
+      type: String,
+      trim: true,
     },
 
     // Legacy field kept for migration reference — DO NOT USE in new code
@@ -44,6 +70,19 @@ const userSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+
+    categoryExpertise: {
+      type: Map,
+      of: new mongoose.Schema({
+        answersGiven: { type: Number, default: 0 },
+        acceptedAnswers: { type: Number, default: 0 },
+        helpfulVotes: { type: Number, default: 0 },
+        totalResponseTimeMs: { type: Number, default: 0 }
+      }, { _id: false }),
+      default: {},
+    },
+
+    rejectedSMECategories: [{ type: String }],
 
     goldenTicketCooldownUntil: {
       type: Date,

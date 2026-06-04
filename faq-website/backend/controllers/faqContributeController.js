@@ -53,7 +53,7 @@ async function checkDuplicate(question) {
 // POST /api/faqs/contribute
 exports.contribute = async (req, res, next) => {
   try {
-    const { category, customCategory, question, answer } = req.body;
+    const { category, customCategory, question, answer, attachments } = req.body;
     const userId = req.user?.id;
 
     if (!category || !question?.trim() || !answer?.trim()) {
@@ -91,6 +91,7 @@ exports.contribute = async (req, res, next) => {
       customCategory,
       contributedBy: userId,
       sourceType: 'community',
+      attachments: attachments || [],
     });
 
     res.status(201).json({

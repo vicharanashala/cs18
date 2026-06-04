@@ -4,7 +4,9 @@ const { normalizeCategory } = require('../utils/constants');
 
 exports.getFaqs = async (req, res, next) => {
   try {
-    const faqs = await FAQ.find().lean();
+    const faqs = await FAQ.find()
+      .populate('attachments.uploadedBy', 'username email')
+      .lean();
 
     // Dynamically calculate recentViewsBoost for each FAQ on read
     const mapped = faqs.map(faq => {
@@ -130,6 +132,29 @@ exports.submitFeedback = async (req, res, next) => {
       helpfulCount: faq.helpfulCount, 
       notHelpfulCount: faq.notHelpfulCount 
     });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * GET /api/faqs/:id
+ * Public — no authentication required.
+ * Returns a single published FAQ so that guest users can open FAQ detail pages.
+ */
+exports.getFaqById = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const faq = await FAQ.findById(id)
+      .populate('attachments.uploadedBy', 'username email')
+      .lean();
+
+    if (!faq) {
+      return res.status(404).json({ success: false, message: 'FAQ not found.' });
+    }
+
+    res.json({ success: true, faq });
   } catch (err) {
     next(err);
   }

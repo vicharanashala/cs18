@@ -6,6 +6,7 @@ const FAQ = require("./models/FAQ");
 const Category = require("./models/Category");
 const SemanticCluster = require("./models/SemanticCluster");
 const getEmbedding = require("./utils/embedding");
+const { normalizeCategory } = require("./utils/constants");
 
 /* CONNECT */
 mongoose
@@ -122,7 +123,7 @@ async function seedData() {
 
       // 3. Create canonical FAQ directly
       const faq = new FAQ({
-        categoryId: categoryId,
+        category: normalizeCategory(categoryName),
         question: cleanedQuestion,
         answer: cleanedAnswer,
         embedding: embedding
