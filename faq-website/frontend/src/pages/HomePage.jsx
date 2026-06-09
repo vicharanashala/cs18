@@ -167,7 +167,15 @@ export default function HomePage() {
                 </div>
               )}
               {searchResults.length === 0 && !isSearching && (
-                <p className="px-5 py-4 text-sm text-slate-500 text-center">No results for "{searchQuery}"</p>
+                <div className="px-5 py-6 text-center">
+                  <p className="text-sm font-semibold text-slate-300 font-bricolage mb-2">No matching FAQs found.</p>
+                  <p className="text-xs text-slate-500 mb-4 font-inter">Try different keywords or explore other options:</p>
+                  <div className="flex flex-col gap-2">
+                    <button onClick={() => navigate('/raise-ticket')} className="text-xs font-semibold bg-white/5 hover:bg-white/10 px-3 py-2 rounded-xl border border-white/10 text-slate-300 transition-colors font-bricolage">Raise Ticket</button>
+                    <button onClick={() => navigate('/golden-ticket')} className="text-xs font-semibold bg-amber-500/10 hover:bg-amber-500/20 px-3 py-2 rounded-xl border border-amber-500/20 text-amber-400 transition-colors font-bricolage">Create Golden Ticket</button>
+                    <button onClick={() => navigate('/dashboard')} className="text-xs font-semibold bg-purple-500/10 hover:bg-purple-500/20 px-3 py-2 rounded-xl border border-purple-500/20 text-purple-400 transition-colors font-bricolage">Ask Bee Assistant</button>
+                  </div>
+                </div>
               )}
               {searchResults.map(faq => (
                 <button

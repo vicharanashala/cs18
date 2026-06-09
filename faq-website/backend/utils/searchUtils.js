@@ -165,16 +165,25 @@ function keywordScore(faq, query, tokens, expandedTokens) {
   }
 
   // Token-level fuzzy match (Levenshtein)
-  for (const token of tokens) {
-    const words = text.split(/\s+/);
-    for (const word of words) {
-      if (word.length < 3) continue;
-      const dist = levenshtein(token, word);
-      const ratio = 1 - dist / Math.max(token.length, word.length);
-      if (ratio > 0.75) {
-        fuzzyScore = Math.max(fuzzyScore, ratio);
+  const validTokens = tokens.filter(t => t.length >= 3);
+  if (validTokens.length > 0) {
+    let matchedScoreSum = 0;
+    for (const token of validTokens) {
+      const words = text.split(/\s+/);
+      let bestRatio = 0;
+      for (const word of words) {
+        if (word.length < 3) continue;
+        const dist = levenshtein(token, word);
+        const ratio = 1 - dist / Math.max(token.length, word.length);
+        if (ratio > bestRatio) {
+          bestRatio = ratio;
+        }
+      }
+      if (bestRatio > 0.75) {
+        matchedScoreSum += bestRatio;
       }
     }
+    fuzzyScore = matchedScoreSum / validTokens.length;
   }
 
   // Tag overlap
@@ -284,20 +293,39 @@ async function searchFAQs(faqs, rawQuery, options = {}) {
       rec               * WEIGHTS.RECENCY +
       verified          * WEIGHTS.VERIFIED;
 
+    const rawSimilarity = Math.max(
+      semScore || 0,
+      exactScore > 0 ? Math.max(0.85, exactScore) : fuzzyScore,
+      tagScore
+    );
+    const similarity = Math.round(rawSimilarity * 1000) / 1000;
+
+    // Debug logging for top candidates
+    if (similarity > 0.5) {
+      console.log(`[Search Debug] Candidate:`, {
+        query,
+        similarity,
+        faq: faq.question || faq.canonicalQuestion || faq.title
+      });
+    }
+
     scored.push({
       ...faq,
+      similarity,
       _searchScore:        Math.round(finalScore * 1000) / 1000,
       _semanticScore:      semScore,
       _keywordScore:       Math.round(keywordTotal * 1000) / 1000,
       _popularityScore:    Math.round(pop * 1000) / 1000,
       _recencyScore:       Math.round(rec * 1000) / 1000,
       _matchType:          semScore !== null ? 'semantic' : 'keyword',
-      _matchPercentage:    Math.min(99, Math.round(finalScore * 100)),
+      _matchPercentage:    Math.min(99, Math.round(similarity * 100)),
     });
   }
 
+  const MIN_SIMILARITY = 0.75;
+
   const sorted = scored
-    .filter(f => f._searchScore > 0.05)
+    .filter(f => f.similarity >= MIN_SIMILARITY)
     .sort((a, b) => b._searchScore - a._searchScore);
 
   const deduplicated = deduplicateByQuestion(sorted);
@@ -385,6 +413,12 @@ function clusterSimilarQuestions(faqs, similarityThreshold = 0.82) {
     for (let j = i + 1; j < faqs.length; j++) {
       if (used.has(faqs[j]._id)) continue;
       const sim = textSimilarity(faqs[i].question, faqs[j].question);
+      const keywordOverlap = tokenOverlapSimilarity(faqs[i].question, faqs[j].question);
+
+      if (sim < 0.75 || keywordOverlap === 0) {
+        continue; // reject obvious mismatch
+      }
+
       if (sim >= similarityThreshold) {
         group.push(faqs[j]);
         used.add(faqs[j]._id);

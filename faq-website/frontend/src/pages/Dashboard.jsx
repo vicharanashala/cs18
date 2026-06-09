@@ -1275,10 +1275,19 @@ export default function Dashboard() {
                     
                     {!isSearching && faqSearchResults.length === 0 && discussionSearchResults.length === 0 && (
                       <div className="text-center py-24 flex flex-col items-center">
-                        <p className="text-slate-500 font-medium mb-6">No strongly related FAQs found.</p>
-                        <button onClick={() => navigate('/raise-ticket')} className="glass-dark text-white font-semibold py-3.5 px-6 rounded-2xl hover:bg-white/5 border border-white/5 transition-all text-sm flex items-center gap-2 font-bricolage cursor-pointer">
-                          <Plus size={16} /> Didn't find what you need? Raise a Ticket
-                        </button>
+                        <p className="text-slate-400 font-medium mb-2 font-bricolage text-lg">No matching FAQs found.</p>
+                        <p className="text-slate-500 text-sm mb-6">Try different keywords or explore other options:</p>
+                        <div className="flex flex-col sm:flex-row gap-3">
+                          <button onClick={() => navigate('/raise-ticket')} className="glass border border-white/10 text-white font-semibold py-3 px-5 rounded-2xl hover:bg-white/5 transition-all text-sm flex items-center justify-center font-bricolage cursor-pointer">
+                            Raise Ticket
+                          </button>
+                          <button onClick={() => navigate('/golden-ticket')} className="glass border border-amber-500/20 text-amber-400 bg-amber-500/5 hover:bg-amber-500/10 font-semibold py-3 px-5 rounded-2xl transition-all text-sm flex items-center justify-center font-bricolage cursor-pointer">
+                            Create Golden Ticket
+                          </button>
+                          <button onClick={() => navigate('/dashboard')} className="glass border border-purple-500/20 text-purple-400 bg-purple-500/5 hover:bg-purple-500/10 font-semibold py-3 px-5 rounded-2xl transition-all text-sm flex items-center justify-center font-bricolage cursor-pointer">
+                            Ask Bee Assistant
+                          </button>
+                        </div>
                       </div>
                     )}
 

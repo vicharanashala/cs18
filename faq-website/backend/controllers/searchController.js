@@ -121,6 +121,7 @@ exports.performSearch = async (req, res) => {
           ? (matches[0]._semanticScore !== null ? 'semantic' : 'keyword')
           : 'none',
         insight,
+        hasResults: matches.length > 0,
       });
 
     } else if (type === 'discussion') {
@@ -149,6 +150,7 @@ exports.performSearch = async (req, res) => {
         insight: grouped.length > 0
           ? `${grouped.length} related discussion thread${grouped.length !== 1 ? 's' : ''} grouped`
           : '',
+        hasResults: matchesWithGrouping.length > 0,
       });
 
     } else {
