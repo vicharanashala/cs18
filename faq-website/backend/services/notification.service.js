@@ -563,5 +563,6 @@ module.exports = {
   markAllRead,
   deleteNotification,
   getUnreadCount,
+  setSocketIO: exports.setSocketIO,
   ...NOTIF,
 };

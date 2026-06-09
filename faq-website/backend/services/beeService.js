@@ -3,12 +3,15 @@ const FAQ = require('../models/FAQ');
 const SystemSettings = require('../models/SystemSettings');
 const VoiceAnalytics = require('../models/VoiceAnalytics');
 
-const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY || 'dummy_key', // prevent crash if missing on boot
-});
+let groq;
+if (process.env.GROQ_API_KEY) {
+  groq = new Groq({
+    apiKey: process.env.GROQ_API_KEY,
+  });
+}
 
 exports.chatWithGroq = async (userMessage, userIp) => {
-  if (!process.env.GROQ_API_KEY || process.env.GROQ_API_KEY === 'dummy_key') {
+  if (!groq) {
     return "I am currently offline. The Groq API key is missing from the server environment.";
   }
 

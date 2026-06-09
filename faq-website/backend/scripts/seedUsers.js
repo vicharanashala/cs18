@@ -27,7 +27,7 @@ async function seed() {
 
 
   // ── Create users ──────────────────────────────────────────────────────────
-  const users = await User.insertMany([
+  const users = await User.create([
     {
       email: 'alice@infracon.com', password: 'Password123', role: 'admin',
       fullName: 'Alice Johnson', username: 'alice_j',

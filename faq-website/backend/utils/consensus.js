@@ -5,12 +5,20 @@ const User = require('../models/User');
 const { recordTransaction } = require('./walletHelper');
 const expertiseService = require('../services/expertise.service');
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+let groq;
+if (process.env.GROQ_API_KEY) {
+  groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+}
 
 async function generateConsensus(clusterId) {
   try {
     const cluster = await SemanticCluster.findById(clusterId);
     if (!cluster) return;
+    
+    if (!groq) {
+      console.warn("Consensus generation skipped: GROQ_API_KEY is missing.");
+      return;
+    }
 
     const answers = await Answer.find({ clusterId }).populate('userId', 'email reputation');
 

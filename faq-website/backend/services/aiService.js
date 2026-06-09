@@ -1,12 +1,15 @@
 const { OpenAI } = require('openai');
 const FAQ = require('../models/FAQ');
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || 'dummy_key', // prevent crash if not set immediately
-});
+let openai;
+if (process.env.OPENAI_API_KEY) {
+  openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+  });
+}
 
 exports.chatWithKnowledge = async (userMessage) => {
-  if (!process.env.OPENAI_API_KEY) {
+  if (!openai) {
     return "I am currently offline. Please ask the administrator to configure the OpenAI API key.";
   }
 

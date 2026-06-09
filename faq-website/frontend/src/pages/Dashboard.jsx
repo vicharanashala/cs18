@@ -1034,24 +1034,15 @@ export default function Dashboard() {
       const isLoggedIn = Boolean(localStorage.getItem('token'));
 
       if (activeTab === 'faq') {
-        // Guests: FAQ results ONLY — discussion section is completely invisible
-        if (isLoggedIn) {
-          const [resFaq, resDisc] = await Promise.all([
-            axiosClient.get('/search', { params: { q: query, type: 'faq' } }),
-            axiosClient.get('/search', { params: { q: query, type: 'discussion' } }),
-          ]);
-          setFaqSearchResults(resFaq.data.matches);
-          setSearchInsight(resFaq.data.insight || '');
-          setFaqMatchType(resFaq.data.matchType || 'none');
-          setDiscussionSearchResults(resDisc.data.matches);
-        } else {
-          // Guest path — never fires discussion search, never leaks content existence
-          const resFaq = await axiosClient.get('/search', { params: { q: query, type: 'faq' } });
-          setFaqSearchResults(resFaq.data.matches || []);
-          setSearchInsight(resFaq.data.insight || '');
-          setFaqMatchType(resFaq.data.matchType || 'none');
-          setDiscussionSearchResults([]); // explicitly empty — no cluster results rendered
-        }
+        // Both guests and logged-in users see FAQ + Discussion results
+        const [resFaq, resDisc] = await Promise.all([
+          axiosClient.get("/search", { params: { q: query, type: "faq" } }),
+          axiosClient.get("/search", { params: { q: query, type: "discussion" } }),
+        ]);
+        setFaqSearchResults(resFaq.data.matches);
+        setSearchInsight(resFaq.data.insight || "");
+        setFaqMatchType(resFaq.data.matchType || "none");
+        setDiscussionSearchResults(resDisc.data.matches);
       } else {
         // Discussions tab — only accessible when logged in (route guard exists in App.jsx)
         const res = await axiosClient.get('/search', { params: { q: query, type: 'discussion' } });
@@ -1088,7 +1079,7 @@ export default function Dashboard() {
         onMouseLeave={() => setIsHovered(false)}
       >
         <NavItem icon={Book} label="FAQ" active={activeTab === 'faq' && !activeCluster}
-          onClick={() => { navigate('/faq'); setActiveCluster(null); setSearchQuery(''); close(); }} />
+          onClick={() => { navigate('/faqs'); setActiveCluster(null); setSearchQuery(''); close(); }} />
         
         <AnimatePresence>
           {isHovered && (
@@ -1107,7 +1098,7 @@ export default function Dashboard() {
                       key={catName}
                       onClick={(e) => {
                         e.stopPropagation();
-                        navigate('/faq');
+                        navigate('/faqs');
                         setActiveCluster(null);
                         setSearchQuery('');
                         setTargetCategory(catName);
@@ -1208,7 +1199,7 @@ export default function Dashboard() {
       <aside className="hidden md:flex w-72 flex-col justify-between py-8 px-5 glass-strong sidebar-shadow z-20">
         <div>
           <div className="flex items-center justify-between mb-10 px-2">
-            <div className="flex items-center gap-2.5 cursor-pointer" onClick={() => { navigate('/faq'); setActiveCluster(null); setSearchQuery(''); }}>
+            <div className="flex items-center gap-2.5 cursor-pointer" onClick={() => { navigate('/faqs'); setActiveCluster(null); setSearchQuery(''); }}>
               <div className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center shadow-md transition-colors hover:bg-white/10">
                 <Book size={16} className="text-slate-300" strokeWidth={2} />
               </div>

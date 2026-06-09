@@ -69,8 +69,8 @@ function App() {
         <Route path="/register" element={<Register />} />
 
         {/* ── PROTECTED ROUTES (require authentication) ── */}
-        <Route path="/discussions" element={<ProtectedRoute><Navigate to="/dashboard?tab=discussions" replace /></ProtectedRoute>} />
-        <Route path="/dashboard/*" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+        <Route path="/discussions" element={<Navigate to="/dashboard?tab=discussions" replace />} />
+        <Route path="/dashboard/*" element={<Dashboard />} />
         <Route path="/raise-ticket" element={<ProtectedRoute><RaiseTicket /></ProtectedRoute>} />
         <Route path="/contribute-faq" element={<ProtectedRoute><ContributeFAQ /></ProtectedRoute>} />
         <Route path="/wallet" element={<ProtectedRoute><WalletPage /></ProtectedRoute>} />
