@@ -37,9 +37,9 @@ export default function TicketStatusPage() {
   const { ticketId } = useParams();
   
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [user, setUser] = useState(null);
 
   useBannedTheme(user);
-  const [user, setUser] = useState(null);
   
   const [ticket, setTicket] = useState(null);
   const [loading, setLoading] = useState(true);

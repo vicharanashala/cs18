@@ -28,6 +28,7 @@ async function recalcUrgency() {
 exports.submitTicket = async (req, res, next) => {
   try {
     const { question, context, category, customCategory, attachments } = req.body;
+    console.log("Received ticket submission:", { question, context, category, customCategory, attachments: attachments?.length || 0 });
 
     if (!question || question.trim().split(/\s+/).length < 3)
       return res.status(400).json({ error: 'Question must be at least 3 words.' });
@@ -47,9 +48,10 @@ exports.submitTicket = async (req, res, next) => {
     }
 
     const existingSub = await Submission.findOne({ clusterId: cluster._id, userId: req.user.id });
+    let newSubmission = null;
 
     if (!existingSub) {
-      const submission = new Submission({
+      newSubmission = new Submission({
         userId: req.user.id,
         clusterId: cluster._id,
         question,
@@ -58,7 +60,7 @@ exports.submitTicket = async (req, res, next) => {
         customCategory,
         attachments: attachments || [],
       });
-      await submission.save();
+      await newSubmission.save();
     }
 
     if (!isNew) {
@@ -93,7 +95,7 @@ exports.submitTicket = async (req, res, next) => {
 
     const ticketNumber = await ticketService.createTicket(
       req.user.id, question, 'general',
-      existingSub?._id || submission?._id, category, 0
+      existingSub?._id || newSubmission?._id, category, 0
     );
 
     res.json({
@@ -103,6 +105,7 @@ exports.submitTicket = async (req, res, next) => {
       wasAutoMerged: !isNew,
     });
   } catch (err) {
+    console.error("Error submitting ticket:", err);
     next(err);
   }
 };

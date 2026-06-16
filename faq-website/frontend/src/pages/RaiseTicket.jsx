@@ -202,13 +202,15 @@ export default function RaiseTicket() {
     setIsSubmitting(true);
     try {
       if (ticketType === 'general') {
-        const res = await axiosClient.post('/discussions/submit', {
+        const payload = {
           question: title,
           context: context,
           category,
           customCategory,
           attachments,
-        });
+        };
+        console.log("Submitting ticket:", payload);
+        const res = await axiosClient.post('/discussions/submit', payload);
         toast.success(res.data.message || 'General query registered.');
         
         setTitle('');
@@ -220,13 +222,15 @@ export default function RaiseTicket() {
         navigate('/dashboard');
       } else {
         // Personal issue flow
-        const res = await axiosClient.post('/personal-issues/resolve', {
+        const payload = {
           question: title,
           context: context,
           category,
           customCategory,
           attachments,
-        });
+        };
+        console.log("Submitting ticket:", payload);
+        const res = await axiosClient.post('/personal-issues/resolve', payload);
         
         const data = res.data;
         if (data.status === 'HIGH' || data.status === 'MEDIUM') {
@@ -240,6 +244,7 @@ export default function RaiseTicket() {
         }
       }
     } catch (err) {
+      console.error("Error submitting ticket:", err);
       const msg = err.response?.data?.message || err.response?.data?.error || 'Failed to submit ticket';
       toast.error(msg);
     } finally {

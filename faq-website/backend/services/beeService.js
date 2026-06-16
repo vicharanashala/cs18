@@ -48,24 +48,43 @@ exports.chatWithGroq = async (userMessage, userIp) => {
     const contextString = contextFaqs.map(faq => `Q: ${faq.question}\nA: ${faq.answer}`).join('\n\n');
 
     // 3. System Prompt setup
-    const systemPrompt = `${settings.beeSystemPrompt || 'You are Bee, a helpful AI assistant.'}
+    const systemPrompt = `${settings.beeSystemPrompt || 'You are Bee, a helpful AI assistant.'}\n\nFAQ Context:\n${contextString}`;
 
-FAQ Context:
-${contextString}`;
-
-    // 4. Call Groq
-    const completion = await groq.chat.completions.create({
-      model: 'llama-3.3-70b-versatile',
+    // Detailed Logging Setup
+    const provider = 'Groq';
+    const model = 'llama-3.3-70b-versatile';
+    const requestPayload = {
+      model,
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userMessage }
       ],
       temperature: 0.5,
-      max_tokens: 250, // Keep responses short and snappy for TTS
-    });
+      max_tokens: 250,
+    };
 
-    tokensUsed = completion.usage?.total_tokens || 0;
-    const answer = completion.choices[0]?.message?.content || "Sorry, I couldn't process your request.";
+    console.log(`\n=== BEE REQUEST TRACE ===`);
+    console.log(`Provider: ${provider}`);
+    console.log(`Model: ${model}`);
+    console.log(`Request Payload:`, JSON.stringify(requestPayload, null, 2));
+
+    let answer = '';
+    
+    try {
+      // 4. Call Groq
+      const completion = await groq.chat.completions.create(requestPayload);
+      console.log(`Provider Response:`, JSON.stringify(completion, null, 2));
+      
+      tokensUsed = completion.usage?.total_tokens || 0;
+      answer = completion.choices[0]?.message?.content || "Sorry, I couldn't process your request.";
+    } catch (apiError) {
+      console.error(`\n=== BEE API ERROR ===`);
+      console.error(`Provider Error Stack Trace:`, apiError.stack || apiError);
+      
+      // Graceful fallback if the AI provider fails (e.g., 401 Invalid API Key)
+      console.log(`Falling back to local FAQ context due to API failure.`);
+      answer = `[AI Fallback Mode] Here is the most relevant information I found:\n\n${contextString}`;
+    }
 
     // Log Analytics asynchronously
     const latencyMs = Date.now() - startTime;
@@ -73,13 +92,13 @@ ${contextString}`;
       queryLength: userMessage.length,
       latencyMs,
       tokensUsed,
-      success: true,
+      success: true, // We consider it a success if we successfully return an answer (even a fallback)
       ip: userIp
     }).catch(err => console.error("Failed to log voice analytics:", err));
 
     return answer;
   } catch (error) {
-    console.error('[Groq Chat Error]:', error);
+    console.error('[Bee Service Error] Stack Trace:', error.stack || error);
     
     const latencyMs = Date.now() - startTime;
     VoiceAnalytics.create({
@@ -91,8 +110,8 @@ ${contextString}`;
     }).catch(err => console.error("Failed to log voice analytics:", err));
 
     if (error.status === 503 || error.status === 429) {
-      return "I'm currently receiving too many requests. Please try again in a moment.";
+      throw new Error("I'm currently receiving too many requests. Please try again in a moment.");
     }
-    throw error;
+    throw new Error(`AI Service Error: ${error.message}`);
   }
 };

@@ -31,9 +31,12 @@ export default function BoostButton({
 
   const isActive = !!isBoosted;
 
-  const handleBoost = async () => {
+  const handleBoost = async (e) => {
+    if (e) e.stopPropagation();
+    console.log("BOOST CLICKED", clusterId || ticketId);
     setIsBoosting(true);
     setShowConfirm(false);
+    console.log("Before API Call: POST /api/boost/cluster or /ticket");
     try {
       let res;
       if (clusterId) {
@@ -41,10 +44,12 @@ export default function BoostButton({
       } else if (ticketId) {
         res = await axiosClient.post(`/boost/ticket/${ticketId}`);
       }
+      console.log("After API Call, Response:", res.data);
       toast.success('🚀 Boost activated for 10 minutes!');
       if (onBoosted) onBoosted(res.data);
     } catch (err) {
-      const msg = err.response?.data?.message || 'Boost failed. Please try again.';
+      console.error("Boost API failed:", err);
+      const msg = err.response?.data?.message || err.response?.data?.error || 'Boost failed. Please try again.';
       toast.error(msg);
     } finally {
       setIsBoosting(false);
@@ -93,6 +98,7 @@ export default function BoostButton({
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.9 }}
+            onClick={(e) => e.stopPropagation()}
             className="absolute right-0 top-full mt-2 z-50 w-52 glass-card border border-white/10 rounded-2xl p-4 shadow-xl"
           >
             <p className="text-slate-200 text-xs font-semibold mb-3 leading-relaxed font-bricolage">
@@ -103,7 +109,7 @@ export default function BoostButton({
             )}
             <div className="flex gap-2">
               <button
-                onClick={() => setShowConfirm(false)}
+                onClick={(e) => { e.stopPropagation(); setShowConfirm(false); }}
                 className="flex-1 text-slate-400 hover:text-slate-200 text-xs font-semibold py-2 rounded-xl border border-white/10 hover:bg-white/5 transition-colors font-bricolage"
               >
                 Cancel

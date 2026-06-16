@@ -15,7 +15,12 @@ exports.chat = async (req, res, next) => {
       answer
     });
   } catch (error) {
-    console.error('[Bee Controller Error]:', error);
-    res.status(500).json({ success: false, message: 'Failed to process AI chat with Groq.' });
+    console.error(`\n=== BEE CONTROLLER ERROR ===`);
+    console.error('Stack Trace:', error.stack || error);
+    res.status(500).json({ 
+      success: false, 
+      message: error.message || 'Failed to process AI chat with Groq.',
+      errorDetails: error.toString()
+    });
   }
 };

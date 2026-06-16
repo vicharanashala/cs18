@@ -614,7 +614,16 @@ function RewardControl({ label, value, onUpdate, accent = 'indigo', user }) {
     const payload = operator === 'add'
       ? { operation: 'add',    amount: raw }
       : { operation: 'remove', amount: raw };
-    const endpoint = label.toLowerCase() + 'S';   // 'sp' | 'pizza' | 'slices'
+
+    const REWARD_ENDPOINT_MAP = {
+      'SP': 'sp',
+      'Pizza': 'pizza',
+      'Slices': 'slices'
+    };
+    const endpoint = REWARD_ENDPOINT_MAP[label] || label.toLowerCase();
+    
+    console.log(`Sending PATCH to /user-management/users/${user._id}/${endpoint}`);
+    
     axiosClient
       .patch(`/user-management/users/${user._id}/${endpoint}`, payload)
       .then((res) => {
@@ -623,6 +632,7 @@ function RewardControl({ label, value, onUpdate, accent = 'indigo', user }) {
         toast.success(`${label} ${operator === 'add' ? 'added' : 'removed'}`);
       })
       .catch((err) => {
+        console.error("PATCH request failed:", err.response?.data || err.message);
         toast.error(err.response?.data?.error || `Failed to update ${label.toLowerCase()}`);
       })
       .finally(() => setLoading(false));
